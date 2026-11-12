@@ -51,20 +51,29 @@ describe("GET /api/teacher/failed-extractions", () => {
     assert.equal(args.take, 50);
   });
 
-  it("excludes the conversation payload from the select by default", async () => {
+  it("selects ids, dates, kind and status, and no conversation or error text", async () => {
     await GET(new Request("http://localhost/api/teacher/failed-extractions"));
 
     const args = mockFindMany.mock.calls[0].arguments[0];
-    assert.equal(args.select.payload, undefined);
-    assert.equal(args.select.error, true);
-    assert.equal(args.select.extractorKey, true);
+    assert.deepEqual(Object.keys(args.select).sort(), [
+      "attempts",
+      "conversationId",
+      "createdAt",
+      "extractorKey",
+      "id",
+      "status",
+      "student",
+      "studentId",
+    ]);
+    assert.deepEqual(args.select.student, { select: { displayName: true } });
   });
 
-  it("includes the payload only when ?include=payload is passed", async () => {
+  it("ignores ?include=payload: the text is only on the detail route", async () => {
     await GET(new Request("http://localhost/api/teacher/failed-extractions?include=payload"));
 
     const args = mockFindMany.mock.calls[0].arguments[0];
-    assert.equal(args.select.payload, true);
+    assert.equal(args.select.payload, undefined);
+    assert.equal(args.select.error, undefined);
   });
 
   it("returns the rows in the standard success envelope", async () => {

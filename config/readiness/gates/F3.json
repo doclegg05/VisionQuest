@@ -5,6 +5,24 @@
   "title": "Bookkeeping after the response",
   "doneWhen": "The lint rule is an error and the tree passes it. Route tests show the response does not wait.",
   "check": {
-    "type": "pending"
+    "type": "test",
+    "files": [
+      "src/lib/keyed-serial-runner.test.ts",
+      "src/lib/after-response.test.ts",
+      "src/lib/error-log-guard.test.ts",
+      "src/lib/dashboard/tasks.test.ts",
+      "src/app/api/orientation/welcome-video/route.test.ts",
+      "src/app/api/orientation/route.test.ts",
+      "src/app/api/resume/route.test.ts",
+      "src/app/api/portfolio/route.test.ts",
+      "src/app/api/certifications/route.alert-sync.test.ts",
+      "src/app/api/events/[id]/register/route.test.ts",
+      "src/app/api/credentials/share/route.alert-sync.test.ts",
+      "src/app/api/forms/upload/route.test.ts",
+      "src/app/api/forms/sign/route.test.ts",
+      "src/app/api/appointments/book/route.test.ts",
+      "src/app/api/goal-resource-links/[id]/route.test.ts",
+      "src/app/api/applications/applications.test.ts"
+    ]
   }
 }

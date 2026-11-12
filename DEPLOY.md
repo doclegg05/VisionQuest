@@ -1,4 +1,4 @@
-# Deployment Runbook — VisionQuest
+# Deployment Runbook for VisionQuest
 
 This runbook covers the supported production path: Render for app hosting plus Supabase for PostgreSQL and file storage.
 
@@ -7,7 +7,8 @@ This runbook covers the supported production path: Render for app hosting plus S
 - GitHub repo: `https://github.com/doclegg05/VisionQuest.git`
 - Supabase project
 - Render account
-- Google AI Studio account for Gemini
+- A Mac or other host that runs the local Sage model through the relay. See the [Mac Sage connection runbook](docs/runbooks/mac-sage-connection.md)
+- Optional Google AI Studio account for Gemini, only if Sage uses the cloud model
 - Optional Google Cloud project for OAuth
 - Optional SMTP provider for password reset mail
 - Optional Sentry project
@@ -75,7 +76,11 @@ Use the outputs for:
 
 ## 3. Get Third-Party Credentials
 
-### Gemini
+### Gemini (optional)
+
+Production runs Sage on a local model through the Mac relay, so it needs no Gemini key. `GEMINI_API_KEY` is optional in `src/lib/env.ts`, and no boot probe checks it. While `AI_LOCAL_ONLY=true` (or one of the older switches `VQ_MAC_RELAY_ENABLED=true`, `COHORT_DEMO_MODE=true` or `COHORT_DEMO_LOCAL_ONLY=true`), `src/lib/ai/demo-local-only.ts` refuses cloud inference for the whole service, so a Gemini key would go unused.
+
+To run Sage on Gemini instead:
 
 1. Go to `https://aistudio.google.com/app/apikey`
 2. Create an API key
@@ -115,6 +120,19 @@ If you want error reporting:
 - `SENTRY_DSN`
 - `NEXT_PUBLIC_SENTRY_DSN`
 
+Before you set either key, change these settings in the Sentry project. The app strips student details from its reports, and these settings are the second layer.
+
+1. **Settings, Security & Privacy**: turn on **Prevent Storing of IP Addresses**.
+2. **Settings, Security & Privacy**: turn on **Data Scrubber** and **Use Default Scrubbers**. Add `displayName`, `email`, `studentId`, `message` and `slug` to **Additional Sensitive Fields**.
+3. **Settings, Data Retention** (if your plan shows it): pick the shortest event retention.
+4. **Settings, Client Keys (DSN), Allowed Domains**: enter only `https://visionquest.onrender.com`.
+5. **Settings, Spike Protection** and the key's **Rate Limit**: turn both on so a loop of errors cannot fill the quota.
+6. Leave **Session Replay**, **User Feedback**, **Crons** and **Logs** off.
+7. Consider the Sentry SDK tunnel option, so reports leave from Render's address and not the student's browser.
+8. Sign Sentry's Data Processing Addendum under **Organization Settings, Legal & Compliance**.
+
+Even with all of this, each report's web request shows Sentry the student's IP address and browser. Item 7 is the only setting that hides them.
+
 ## 4. Deploy To Render
 
 ### Option A: Blueprint
@@ -153,11 +171,14 @@ If you do not use the blueprint:
 | `JWT_SECRET` | Hex secret, at least 32 characters (the boot probe refuses shorter) |
 | `ADMIN_DATABASE_URL` | Connection string for the RLS-bypassing `postgres` role, used by `prismaAdmin` (crisis notifications, nudges, SMS webhook). **Required since 2026-09-07: a production boot without it is refused by `src/lib/boot-probes.ts`**, so a deploy fails to start rather than running with the admin client silently demoted to `vq_app`. |
 | `RLS_CONTEXT_INJECTION` | Must be the exact string `true`. **Required since 2026-09-07 (same boot probe)**: anything else runs every query with no session context, and the staff-scoping policies enforce nothing. |
+| `AI_LOCAL_ONLY` | `true` blocks every cloud AI call for the whole service. **Required since readiness task H4: a production boot is refused by `src/lib/boot-probes.ts` unless this is `true` (or an older switch is on: `COHORT_DEMO_MODE`, `COHORT_DEMO_LOCAL_ONLY`, `VQ_MAC_RELAY_ENABLED`), or `AI_CLOUD_INFERENCE` is exactly `allowed`.** Both together, or a misspelled value, also refuse the boot. See [Cloud AI block](#cloud-ai-block-check-before-deploying) |
+| `AI_LOCAL_APPROVED_ORIGIN` | The one local AI origin Sage may call while the block is on: `http://127.0.0.1:11437`, the relay's adapter inside the service. Without it every local call is refused too. The older name `COHORT_DEMO_LOCAL_AI_ORIGIN` still works; if both are set they must name the same origin |
 | `TEACHER_KEY` | Gate for `/teacher-register` |
 | `API_KEY_ENCRYPTION_KEY` | Base64-encoded 32-byte key |
 | `APP_BASE_URL` | Public Render URL |
 | `CRON_SECRET` | Shared secret for internal scheduled routes |
-| `GEMINI_API_KEY` | Gemini credential |
+| `TRUSTED_PROXY_HOPS` | How many proxies append to `X-Forwarded-For` before the app. Default `2`: Render serves onrender.com through Cloudflare, so the chain is client, Cloudflare edge, Render's proxy, app, and the client is 2 entries from the right. The per-network sign-in and recovery limits count that entry, never the first entry, which the caller writes. Too low (`1`) counts the Cloudflare edge, so every student behind one edge shares a limit; too high (`3` or more) reaches entries the caller wrote, so the address can be forged. Confirm it with [Check the sign-in limits' client address](#check-the-sign-in-limits-client-address). A value that is not a whole number from 1 to 10 stops the boot |
+| `CLOUDFLARE_IN_FRONT` | `true` makes the limits count `CF-Connecting-IP`, which Cloudflare sets to the client on every request it proxies (Cloudflare sits in front of Render's own domain). Default off (`false` or unset): turn it on only after the check below shows that header holds the real client and no request can reach Render without passing Cloudflare, because a request that skipped Cloudflare could carry a header the caller wrote. Any other value stops the boot |
 | `STORAGE_ENDPOINT` | Supabase S3 endpoint |
 | `STORAGE_REGION` | Usually `us-east-1` |
 | `STORAGE_BUCKET` | `Uploads` (existing private bucket; case-sensitive) |
@@ -171,7 +192,10 @@ If you do not use the blueprint:
 | `GOOGLE_CLIENT_ID` | Google OAuth |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth |
 | `GOOGLE_REDIRECT_URI` | Google OAuth callback URL |
+| `GEMINI_API_KEY` | Gemini credential. Needed only when Sage runs on the cloud model |
 | `GEMINI_MODEL` | Override default Gemini model |
+| `VQ_MAC_RELAY_ENABLED` | `true` turns on the Mac relay for local Sage and blocks cloud inference. Its other variables are in the [Mac Sage connection runbook](docs/runbooks/mac-sage-connection.md) |
+| `ADMIN_KEY` | Registration key for the first admin account. See [Create the first admin](#8-create-the-first-admin) |
 | `SAGE_AGENT_ENABLED` | Enable Sage tool calls and server-driven slash commands |
 | `CF_ACCESS_CLIENT_ID` | Cloudflare Access service-token client id for the local Sage AI endpoint |
 | `CF_ACCESS_CLIENT_SECRET` | Cloudflare Access service-token client secret for the local Sage AI endpoint |
@@ -189,6 +213,7 @@ If you do not use the blueprint:
 | `NEXT_PUBLIC_SENTRY_DSN` | Client error tracking |
 | `LOG_LEVEL` | Logging verbosity |
 | `COHORT_DEMO_MODE` | `true` opens the sign-in page to demo students and a shared demo instructor. See [Cohort demo mode](#cohort-demo-mode) |
+| `REAL_STUDENT_DATA` | `true` once real students use the database. Set it only after the demo closeout has run. With it on, production refuses to start while `COHORT_DEMO_MODE` is on. See [Turn it off after Dec 18, 2026](#turn-it-off-after-dec-18-2026) |
 
 Render dashboard note:
 
@@ -225,17 +250,40 @@ Fallback path:
 DATABASE_URL="..." node scripts/promote-teacher.mjs <email-or-student-id>
 ```
 
-## 8. Verification Checklist
+## 8. Create The First Admin
+
+Admin accounts come from the same `/teacher-register` page as teachers, with a different key.
+
+Preferred path:
+
+1. Generate a key locally: `openssl rand -base64 32 | tr -d '\n'`
+2. In the Render dashboard, open the web service, then **Environment**. Add `ADMIN_KEY` with that value and no quotes. Save, and let Render deploy. Without `ADMIN_KEY`, the page answers "Admin registration is not configured."
+3. Open `/teacher-register`, choose **Administrator**, and enter the key, your name, your email and a password.
+4. The page creates the admin account and signs you in.
+
+If an active teacher account already uses that email, the page promotes it to admin instead. It keeps the password and MFA, signs out every open session, and issues no new session. Sign in again with the current password.
+
+The route allows 5 attempts per key and 20 attempts across all callers in 15 minutes. After that it answers "Too many attempts" until the window ends.
+
+Fallback path, for an account that already exists. Use the `ADMIN_DATABASE_URL` connection string, because `Student` has row-level security and `DATABASE_URL` connects as `vq_app`:
+
+```bash
+DATABASE_URL="..." npm run users:promote-admin -- <email-or-student-id>
+```
+
+The script sets the role to `admin`, signs out the account's open sessions, and writes an audit row.
+
+## 9. Verification Checklist
 
 ### Service health
 
 - `GET /api/health` returns 200
 - Web service boots without migration failure
-- All three cron jobs show successful runs
+- Every pg_cron job shows a recent successful run. Run `npm run cron:health`. It checks the jobs listed in `EXPECTED_CRON_JOBS` in `scripts/lib/cron-health.mjs`, which are the 12 that the migrations register. To recount: `grep -rh -A1 "PERFORM cron.schedule(" prisma/migrations | grep -oE "'[a-z0-9-]+'" | sort -u | wc -l`
 
 ### Student flow
 
-- Student can register and sign in
+- An instructor can create a student account, and the student can sign in. Students cannot register themselves: `/signup` redirects to the sign-in page
 - Student can open Sage and receive a streamed response
 - Admin `Program Setup -> AI Provider -> Test Connection` succeeds if Sage is using local AI
 - Goal extraction runs after chat
@@ -258,7 +306,41 @@ DATABASE_URL="..." node scripts/promote-teacher.mjs <email-or-student-id>
 - Google OAuth callback works if enabled
 - Sentry receives test errors if configured
 
-## 9. Monitoring And Recovery
+### Check the sign-in limits' client address
+
+Run this after every deploy that changes `TRUSTED_PROXY_HOPS` or `CLOUDFLARE_IN_FRONT`, and once before launch. It tests that the address on a failed sign-in's audit row equals your real public address.
+
+1. From a classroom or home network, note the public addresses:
+
+   ```bash
+   curl -4 https://ifconfig.me
+   curl -6 https://ifconfig.me
+   ```
+
+2. Make one failed sign-in with a forged header and a fake login. The login matches no account, so no real student's limit is spent:
+
+   ```bash
+   curl -s -X POST https://visionquest.onrender.com/api/auth/login -H 'Origin: https://visionquest.onrender.com' -H 'Content-Type: application/json' -H 'X-Forwarded-For: 203.0.113.9' -d '{"studentId":"zz-address-check-0001","password":"not-a-real-password"}'
+   ```
+
+3. In the Supabase SQL editor:
+
+   ```sql
+   SELECT "createdAt", metadata FROM visionquest."AuditLog" WHERE action LIKE 'auth.login_failed%' AND "createdAt" > now() - interval '2 minutes' ORDER BY "createdAt" DESC LIMIT 5;
+   ```
+
+4. Pick the row that has `metadata.loginHash` (a real student's failed sign-in in the same two minutes has none), and judge its `metadata.ip`:
+   - **Equal to the address from step 1**: correct.
+   - **`203.0.113.9`**: the address can be forged. Block launch; `TRUSTED_PROXY_HOPS` is too high.
+   - **A Cloudflare address**: `TRUSTED_PROXY_HOPS` is too low, and every student behind that edge shares one limit. Cloudflare's ranges are listed at https://www.cloudflare.com/ips/. As of 2026-11 they are IPv4 `173.245.48.0/20`, `103.21.244.0/22`, `103.22.200.0/22`, `103.31.4.0/22`, `141.101.64.0/18`, `108.162.192.0/18`, `190.93.240.0/20`, `188.114.96.0/20`, `197.234.240.0/22`, `198.41.128.0/17`, `162.158.0.0/15`, `104.16.0.0/13`, `104.24.0.0/14`, `172.64.0.0/13`, `131.0.72.0/22` and IPv6 `2400:cb00::/32`, `2606:4700::/32`, `2803:f800::/32`, `2405:b500::/32`, `2405:8100::/32`, `2a06:98c0::/29`, `2c0f:f248::/32`.
+   - **`unknown`**: the chain was shorter than `TRUSTED_PROXY_HOPS`. Lower it by one, redeploy, and run every step again, including the forged header in step 2: a lower setting is the one that can be forged.
+5. Repeat steps 1 to 4 from a second network (a phone hotspot), and again with `curl -6` in step 2. An IPv6 row must show the full address from `curl -6 https://ifconfig.me`; the limit itself counts that address's /64.
+   If `curl -6` in step 2 says it could not resolve the host, visionquest.onrender.com has no IPv6 address. That is not a failed check; skip the IPv6 run.
+6. Confirm the row holds `metadata.loginHash` and that the text `zz-address-check-0001` appears nowhere in it.
+
+What this check cannot see: a request that reaches Render without passing Cloudflare. If Render's own address can be reached directly, a caller there could still choose the counted address. The check above tests only the normal path through Cloudflare.
+
+## 10. Monitoring And Recovery
 
 ### Health check
 
@@ -268,23 +350,59 @@ curl https://your-app.onrender.com/api/health
 
 ### Logs
 
-- Use the Render dashboard for web and cron service logs
+- Use the Render dashboard for web service logs
+- Use Supabase `cron.job_run_details` and `net._http_response` for scheduled jobs. The [cron runbook](./docs/plans/pg-cron-setup-runbook.md) has the queries
 - Use Supabase logs for database and storage issues
 - Use Sentry for client and server exception tracking if enabled
 
 ### Backups
 
-Supabase handles managed backups. For manual export:
+Supabase handles managed backups. To make an export yourself, follow these steps in order. The export holds every student record and this repository is public, so the file must never be inside this checkout.
 
-```bash
-pg_dump "DIRECT_URL" --schema=visionquest > backup.sql
+`pg_dump` needs the session pooler or the direct connection. It does not work through the transaction pooler on port 6543. The value stored in the Render dashboard, service `visionquest`, **Environment** tab, key `ADMIN_DATABASE_URL` is the right kind.
+
+1. Open a new terminal window. In the Render dashboard, service `visionquest`, **Environment** tab, copy the value of the key `ADMIN_DATABASE_URL`. Run the first line below, paste the value, and press Return. Nothing shows as you paste, and the value is not saved in your shell history. The second line clears the clipboard.
+
+   ```sh
+   read -rs ADMIN_DATABASE_URL && export ADMIN_DATABASE_URL
+   pbcopy < /dev/null
+   ```
+
+   Never type or paste the value into a command itself. Every command below reads it from the variable.
+2. Split the password off. `pg_dump` and `psql` read the password from `PGPASSWORD`, so it never appears on a command line, where other programs on this computer could read it. Run these three lines:
+
+   ```sh
+   export PGPASSWORD="$(node -e 'try { process.stdout.write(decodeURIComponent(new URL(process.env.ADMIN_DATABASE_URL).password)) } catch { console.error("The connection string could not be read. Nothing from it was printed."); process.exit(1) }')"
+   export URL_WITHOUT_PASSWORD="$(node -e 'try { const url = new URL(process.env.ADMIN_DATABASE_URL); url.password = ""; process.stdout.write(url.href) } catch { console.error("The connection string could not be read. Nothing from it was printed."); process.exit(1) }')"
+   test -n "$PGPASSWORD" && test -n "$URL_WITHOUT_PASSWORD" && echo ready
+   ```
+
+   Success looks like `ready`. If it prints an error or nothing, stop and ask a developer.
+3. Make the export in a folder outside the checkout that only you can open.
+
+   ```sh
+   mkdir -p -m 700 "$HOME/VisionQuest-backups"
+   pg_dump "$URL_WITHOUT_PASSWORD" --schema=visionquest --file="$HOME/VisionQuest-backups/visionquest-$(date +%Y-%m-%d-%H%M).sql"
+   chmod 600 "$HOME/VisionQuest-backups/"*.sql
+   ls -lh "$HOME/VisionQuest-backups"
+   ```
+
+   Success looks like a file named for today with a size above zero. If `pg_dump` prints an error, stop, keep the output, and ask a developer.
+4. Remove the password from this window, then close the window when you are done. Closing it removes every value from memory.
+
+   ```sh
+   unset PGPASSWORD URL_WITHOUT_PASSWORD
+   ```
+
+Never copy the export into this checkout. As a second lock, `.gitignore` leaves out `/*.sql`, `/*.dump` and `/backups/` at the top of the checkout.
+
+Restore, after steps 1 and 2 above in a new window:
+
+```sh
+psql "$URL_WITHOUT_PASSWORD" --set ON_ERROR_STOP=1 --single-transaction --file="$HOME/VisionQuest-backups/NAME_OF_THE_EXPORT.sql"
 ```
 
-Restore:
-
-```bash
-psql "DIRECT_URL" < backup.sql
-```
+Replace `NAME_OF_THE_EXPORT.sql` with the file name that `ls` showed. This puts an export into a database whose `visionquest` schema is empty, such as a new Supabase project. It stops at the first error and then changes nothing. Putting an export back over the live database removes every change made after the export was taken. Do not do that alone: ask a developer, and read `docs/runbooks/backup-restore.md` first.
 
 ### Rollback
 
@@ -323,12 +441,84 @@ Two limits are fixed in code. One network can start 10 new demo students an hour
 
 ### Turn it off after Dec 18, 2026
 
-1. Open the VisionQuest web service in the Render dashboard, then **Environment**.
-2. Delete `COHORT_DEMO_MODE`. Delete the three limit variables too if you added them.
-3. Save, and let Render deploy.
-4. Open the sign-in page and check that the demo buttons are gone and the Google block is back.
+Closing the demo takes twelve steps over two days. Do them in order, and do not skip one. Each step says what success looks like. If a step fails and the step does not say how to fix it, stop, keep the output on screen or copy it into a note, and ask a developer. Never change the database by hand.
 
-After that, the demo endpoints answer 404, and any demo session that is still open stops working on its next request. Demo accounts have no password, so nobody can sign in to one again. The demo students, the demo instructor and the "Cohort Demo Class" stay in the database until someone deletes them, which this change does not do.
+The tool in this checkout, `scripts/demo-closeout.ts`, deletes every account marked as demo: the demo students and the shared demo instructor. It deletes the "Cohort Demo Class" and every row attached to them, such as chats, goals, upload records, forms, alerts, appointments, case notes, Sage memories, queued jobs and the audit log entries about them. It does all of it in one transaction, then writes one audit log entry that holds counts only. It prints counts, the database name and the host. It never prints a name, a login, an email, an id or the connection string.
+
+What the tool does not remove:
+
+* **Mock students that are not marked as demo.** An account made before demo mode, or made by hand, has no demo mark. The preview counts these under `unmarked`. A number above 0 means mock accounts may still be in the database, and they will look like real students. The tool cannot tell mock from real and never deletes an unmarked account. Decide about each one before real students start.
+* **Public credential pages of those unmarked accounts.** The preview counts them as `publicCredentialPages`, and the ones anyone can open at `/credentials/...` as `publicCredentialPagesSwitchedOn`.
+* **Uploaded files in storage.** The tool deletes the database row for each demo upload. The file itself stays in the bucket named by `STORAGE_BUCKET`, and those files may hold real visitors' documents, because anyone could use the demo. The preview gives the number of files as `uploadedFilesLeftInStorage` and the number of folders as `leftBehind.storageFoldersOfDemoAccounts`. The tool does not remove them. Removing them is a separate step that is not built yet.
+* **Text that mentions the demo.** The preview counts program settings that hold the demo class id (`leftBehind.systemConfigNamingDemoClass`), notices to staff that name a demo account (`leftBehind.staffNotificationsAboutDemoStudents`) and opportunity listings copied from a demo class job lead (`leftBehind.opportunitiesFromDemoLeads`). It changes none of them.
+* **Shared program content** that a demo account only pointed at: employers, events, form templates, program documents, regions, and job listings of other classes. Rate limit rows stay too.
+* **Audit log entries about that shared content.** When a demo student signed up for a real event, updated an application on a real opportunity or saved a real job listing, the audit log entry stays, so the record of it is kept. The tool replaces the demo account's id on it with `demo-closed`. The preview counts these as `leftBehind.auditRowsKeptAboutSharedContent`. Any other entry about kept content, such as the demo instructor changing a real event, still makes the apply refuse. A kept entry keeps its summary text, which can name the demo account's seeded display name, and ids of demo rows the apply deletes.
+
+**Developer check, before the owner's first run.** The apply refuses with `schema_mismatch` when the database lists a migration this checkout does not have, such as one applied from an old branch whose folder never reached `main`. A developer runs this query on production, read only, in the Supabase dashboard's SQL editor (so no connection string goes on a command line), and compares the names with the folders in `prisma/migrations`:
+```sql
+SELECT DISTINCT migration_name FROM visionquest."_prisma_migrations" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL ORDER BY migration_name;
+```
+If that says the relation does not exist, the ledger is in the `public` schema: run the same query with `public."_prisma_migrations"`, which is where the tool looks next.
+Success looks like every name having a folder of the same name in `prisma/migrations` on `main`, and every folder having a name in the list. A name with no folder makes the apply refuse every time. Do not delete the row by hand: tell the owner, and decide with them before step 1.
+
+1. **Bring the main checkout up to date.** Use the main checkout of this repository, not a copy made for one task. In a terminal opened in that folder, run:
+   ```sh
+   git switch main
+   git pull
+   npm ci
+   npx prisma generate
+   ```
+   Success looks like each command finishing with no line that starts with `error`. If `git switch main` refuses because of changed files, stop and ask a developer.
+2. **In Render, delete `COHORT_DEMO_MODE` and keep `AI_LOCAL_ONLY`.** Open the Render dashboard, service `visionquest`, **Environment** tab. Delete the key `COHORT_DEMO_MODE`. Delete `COHORT_DEMO_STUDENTS_PER_HOUR`, `COHORT_DEMO_STUDENTS_PER_DAY` and `COHORT_DEMO_SAGE_PER_DAY` too if you added them. Do not delete `AI_LOCAL_ONLY`. Its value must stay `true`, because it is the switch that blocks cloud AI for every account (see [Cloud AI block](#cloud-ai-block-check-before-deploying)). Save, and wait until the deploy shows **Live**. Success looks like the sign in page with no demo buttons and with the Google block back. From then on the demo endpoints answer 404, and a demo session that is still open stops working on its next request.
+3. **Wait 30 minutes after the deploy shows Live.** A visitor who was using the demo when it closed may still have a request in flight, and the tool refuses while a demo account was used in the last 30 minutes. Success looks like 30 minutes on the clock since the deploy went Live.
+4. **Open a new terminal window used only for this, and load the connection string.** In the new window, go to the main checkout folder. Copy the value stored in the Render dashboard, service `visionquest`, **Environment** tab, key `ADMIN_DATABASE_URL`. Run the first line below, paste the value, and press Return. Nothing shows as you paste, and the value is not saved in your shell history. The second line clears the clipboard.
+   ```sh
+   read -rs ADMIN_DATABASE_URL && export ADMIN_DATABASE_URL
+   pbcopy < /dev/null
+   ```
+   Never type or paste the value into a command itself. The tool reads it from the variable and reads no file for it. Success looks like `test -n "$ADMIN_DATABASE_URL" && echo loaded` printing `loaded`.
+5. **Run the preview and read it.**
+   ```sh
+   node --import tsx scripts/demo-closeout.ts
+   ```
+   The preview reads and changes nothing. Read it top to bottom:
+   * The first three lines say which database this is. Check two of them against the Supabase dashboard of the production project. If either does not match, stop.
+     * The line `Project ref:` must show the same letters as the Project ID in the Supabase dashboard, Project Settings, General. The tool reads it from a session pooler user (`postgres.<ref>`) or from a direct connection host (`db.<ref>.supabase.co`). If it says `not in the connection string`, the value you loaded is neither: stop and ask a developer.
+     * The line `Target: database ... on host ...` must show the same host as the connection string in the Supabase dashboard. Click **Connect** at the top of the project page and read the host: the part after the `@` and before the next `:`.
+       * If the host ends in `pooler.supabase.com`, choose the session pooler there and compare with its host.
+       * If the host starts with `db.` and ends in `.supabase.co`, choose **Direct connection** there and compare with its host, `db.<ref>.supabase.co`. The letters between `db.` and `.supabase.co` are the same Project ID as above.
+       * The database name is `postgres` on every Supabase project, so it tells you nothing.
+     * The line `Server address:` is a private address that the dashboard does not show. Do not compare it.
+   * `marked` is the accounts and classes the apply would delete, and `rowsToDelete` is the rows that would go, table by table.
+   * `unmarked` is the accounts the tool leaves. Read the sentences under the counts. A number above 0 means mock accounts may still be in the database.
+   * `leftBehind.orphans` lists, for each column, the rows that name an account or class that does not exist. Some are expected, such as Sage records kept on purpose for students who left. The lines that start with `Orphan rows in` give each column's number. Write them down. The apply counts each column again after its deletes and refuses if any column is higher, so you do not need to compare them yourself.
+   * `refusals` is the list of reasons an apply would stop. Each is one sentence and a count. Fix the cause and run the preview again. The tool has no option that skips a refusal.
+
+   Success looks like exit code 0, no line that starts with `An apply would be refused`, and a last line that says `To apply, use --expect-accounts=` followed by a number. Write that number down. If the refusal says a demo account was used in the last 30 minutes, check step 2 again, wait 30 minutes and run the preview again. For any other refusal you cannot fix yourself, stop, keep the output, and ask a developer.
+6. **Make or confirm the backup right before the apply.** Make an export with the steps under [Backups](#backups), in this same window. The variable is already loaded, so skip their step 1. In their step 4, run the `unset` line but do not close the window, because step 7 still needs it. A backup in the Supabase dashboard (Database, then Backups) counts instead only if point in time recovery is on for the project. A daily backup can be almost a day old, and restoring it would throw away every change made after it, including real work done since, so only an export made now or point in time recovery can put the database back to the moment right before the apply. Success looks like an export file in `$HOME/VisionQuest-backups` with today's date and time and a size above zero, or point in time recovery shown as on in the dashboard. Without one, do not go on.
+7. **Run the apply.** Use the number from step 5 in place of `NUMBER`:
+   ```sh
+   node --import tsx scripts/demo-closeout.ts --apply --confirm-demo-disabled --expect-accounts=NUMBER
+   ```
+   `--confirm-demo-disabled` is your word that step 2 is finished. The tool can see only this terminal, not Render. `--expect-accounts` makes it refuse if the database changed since the preview. Success looks like exit code 0 and a last line that says `Checked again after the closeout was saved: 0 accounts are marked as demo.` The other exit codes:
+   * Exit code 2: it refused and deleted nothing. Read the sentence, fix the cause, and start again from step 5.
+   * Exit code 1: it stopped. It prints: "The tool stopped. Run the preview again to see whether anything was deleted. If `marked` is 0, the closeout finished. If this keeps happening, stop and ask a developer. Do not change the database by hand." Do exactly that. A lost connection while the database was saving can leave the outcome unknown, which is why the tool does not say whether anything was deleted.
+   * Exit code 3: the closeout was saved, but a demo account was created while it ran, so demo mode is still on somewhere. Check step 2 again, wait 30 minutes and start again from step 5.
+8. **Run the preview again.**
+   ```sh
+   node --import tsx scripts/demo-closeout.ts
+   ```
+   Success looks like `marked` is 0 and `unmarked.students` is the number you expect. If `marked` is above 0, start again from step 5. The orphan numbers can be above 0 here: the apply in step 7 has already checked that no column rose, and its output said so on the line `No column of orphan rows is higher after the deletes than before them.`
+9. **Set `REAL_STUDENT_DATA` to `true`.** In the Render dashboard, service `visionquest`, **Environment** tab, add the key `REAL_STUDENT_DATA` with the value `true`. Do it only after step 8 has succeeded, and before the first real student gets an account. From then on production refuses to start if `COHORT_DEMO_MODE` is ever turned on again. Success looks like the next deploy showing **Live**.
+10. **Check the site.** Success looks like all of these:
+    * The Render log of the start after step 9 has no line named `boot_probe_demo_closeout_unfinished` and none named `boot_probe_demo_rows_beside_real_data`.
+    * Signed in as a teacher, the class list has no "Cohort Demo Class", and the queue of students who need attention has no demo student.
+    * Sage answers one message.
+    * You have decided what to do with each unmarked mock account and each file the preview counted.
+11. **Close the terminal window.** That removes the connection string from memory. Success looks like the window gone.
+12. **The next day, run the preview once more, then close the terminal.** Open a new terminal window, do step 4 again and run the preview from step 5. Success looks like `marked` still 0. If it is above 0, demo accounts were made after the closeout. Stop and ask a developer. Then close the terminal window.
+
+The tool refuses, and deletes nothing, in these cases: demo mode is on in its terminal; its connection is limited by row level security; the checkout and the database are not at the same migration; the number given with `--expect-accounts` is not the number of marked accounts; a demo account was created or used in the last 30 minutes; a class has the demo class code but the demo instructor does not own it; an account with no demo mark is in the plan, is enrolled in the demo class or has rows attached to it; a marked account teaches or coordinates a class or region that has unmarked students; a marked account is named on a row that belongs to someone else or to the program; a marked account is on an audit record, a Sage action or a message about a person, a class or a record that is not demo, such as a real student's appointment or certification; a kept row points at a row the closeout would delete and the database would blank that link; a kept row holds the id of an upload or a goal the closeout would delete in a column with no link. It also checks its own work before it saves. If any row would be left pointing at a deleted account or class, any column of orphan rows would be higher after the deletes than before them, or any table would lose a row the preview did not count, it cancels the whole transaction and reports a refusal.
 
 ### Reset the fictional roster (owner operation)
 
@@ -342,9 +532,9 @@ The reset tool defaults to a preview and never deletes student records. It archi
    ```
 3. Re-enable demo mode in Render and wait for the restart/deployment. The restart clears the bootstrap cache. Enter as the instructor and check the four fresh starter students.
 
-The tool refuses a class not owned by the marked demo instructor, unmarked students in the demo roster, and selected students enrolled in another class. Preview reports counts only. Apply is transactional; any error rolls back all changes. Keep the switch off until the reset finishes. There is no reset endpoint available to public demo visitors. This is a roster reset, not deletion of demo history or instructor settings.
+The tool refuses a class not owned by the marked demo instructor, unmarked students in the demo roster, and selected students enrolled in another class. Preview reports counts only. Apply is transactional; any error rolls back all changes. Keep the switch off until the reset finishes. There is no reset endpoint available to public demo visitors. This is a roster reset, not deletion of demo history or instructor settings. To delete the demo data for good, follow [Turn it off after Dec 18, 2026](#turn-it-off-after-dec-18-2026).
 
-## Chat-First Rebuild (June 2026) — operational notes
+## Chat-First Rebuild (June 2026): operational notes
 
 - **Kill switches** (env vars, all default ON): `SAGE_AGENT_ENABLED=false` (agent tools),
   `SAGE_MEMORY_ENABLED=false` (memory extraction/retrieval), `SAGE_RAG_MODE=keyword`
@@ -371,11 +561,33 @@ configured local endpoint and the pinned `gemma4:12b` model. Direct Gemini and
 OpenRouter inference is refused before network access; `preferCloud` cannot
 bypass the restriction. A local outage never falls back to a cloud model.
 
-Set `COHORT_DEMO_LOCAL_ONLY=true` alongside `COHORT_DEMO_MODE=true` and retain it
-when closing demo entry, so queued demo work remains protected. This safeguard
-also applies to non-demo accounts on this service while either flag is true.
-It does not alter the saved provider settings. Restoring ordinary cloud behavior
-requires explicitly clearing both flags after demo jobs have drained.
+Keep `AI_LOCAL_ONLY=true` set when closing demo entry. It does not depend on
+any demo variable, so removing `COHORT_DEMO_MODE` and `COHORT_DEMO_LOCAL_ONLY`
+later leaves the block on. This safeguard applies to every account on this
+service. It does not alter the saved provider settings.
+
+Cloud AI is allowed only by a written owner decision, and then by removing
+every local only switch and setting `AI_CLOUD_INFERENCE` to exactly `allowed`.
+That variable only lets production start; which prompts may then reach a cloud
+model is still decided by `AI_CLOUD_POLICY`, which reads as `permissive` when
+unset. Set `AI_CLOUD_POLICY=local_only` or `lanes` in the same change.
+
+### Cloud AI block: check before deploying
+
+Production refuses to start unless it says whether cloud AI is blocked or
+allowed. In the Render dashboard, service `visionquest`, Environment tab,
+confirm each of these before the first deploy that carries the check, and again
+after any change to these variables:
+
+1. `AI_CLOUD_INFERENCE` is not set.
+2. `AI_LOCAL_ONLY` is not set, or is exactly `true`. A value such as `yes` stops the start.
+3. `COHORT_DEMO_LOCAL_AI_ORIGIN`, if set, is exactly `http://127.0.0.1:11437`. Any other value makes every Sage call fail.
+4. `VQ_MAC_RELAY_ENABLED` is exactly `true`, and `VQ_MAC_RELAY_AGENT_TOKEN` and `VQ_MAC_RELAY_APP_TOKEN` are still present.
+5. `COHORT_DEMO_MODE` and `REAL_STUDENT_DATA` are not both on.
+
+After the deploy, check that the service is live on the new commit and that
+Sage answers one message. If the deploy did not go live, the Render log has a
+`Boot probe failure` line that names the variable.
 
 Cloud embeddings are blocked without selecting another embedding model or
 reindexing stored vectors. Document retrieval falls back to keyword search;

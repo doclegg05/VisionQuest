@@ -9,6 +9,7 @@ let authorizedStudent: { id: string; studentId: string; role: string } | null;
 const update = mock.fn(async (_args: unknown) => ({}));
 const deleteTokens = mock.fn(async (_args: unknown) => ({ count: 1 }));
 const audit = mock.fn(async (_args: unknown) => undefined);
+const recordView = mock.fn(async (_args: { targetStudentId: string; surface: string }) => ({ recorded: true }));
 const archive = mock.fn(async (_id: string, _actor: string) => ({ storageKey: "archives/authorized-student/test.zip", fileCount: 1 }));
 const presign = mock.fn(async (_key: string, _options: unknown) => "https://storage.example.test/archive");
 const invalidate = mock.fn((_id: string) => undefined);
@@ -30,6 +31,7 @@ mock.module("@/lib/db", { namedExports: {
 } });
 mock.module("@/lib/audit", { namedExports: {
   logAuditEvent: audit,
+  recordStudentView: recordView,
   tryLogAuditEvent: async (args: unknown) => { await audit(args); return { audited: true }; },
 } });
 mock.module("@/lib/storage", { namedExports: {
@@ -78,6 +80,9 @@ describe("archive privacy", () => {
     const req = new NextRequest("http://localhost?key=archives/authorized-student/test.zip");
     assert.equal((await archiveRoute.GET(req, context())).status, 302);
     assert.equal(presign.mock.calls[0].arguments[0], "archives/authorized-student/test.zip");
+    const view = recordView.mock.calls.at(-1)?.arguments[0];
+    assert.equal(view?.targetStudentId, "authorized-student");
+    assert.equal(view?.surface, "archive");
   });
 });
 

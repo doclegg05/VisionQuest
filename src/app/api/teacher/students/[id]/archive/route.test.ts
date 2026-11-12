@@ -62,10 +62,11 @@ mock.module("@/lib/db", {
   },
 });
 
+const presignMock = mock.fn(async () => null as string | null) as any;
 mock.module("@/lib/storage", {
   namedExports: {
     downloadFile: async () => null,
-    getPresignedDownloadUrl: async () => null,
+    getPresignedDownloadUrl: presignMock,
   },
 });
 
@@ -89,6 +90,8 @@ beforeEach(() => {
   appAuditCreateMock.mock.resetCalls();
   adminAuditCreateMock.mock.resetCalls();
   generateStudentArchiveMock.mock.resetCalls();
+  presignMock.mock.resetCalls();
+  presignMock.mock.mockImplementation(async () => null);
   warnMock.mock.resetCalls();
   errorMock.mock.resetCalls();
 
@@ -158,5 +161,39 @@ describe("POST /api/teacher/students/:id/archive", () => {
     assert.equal(res.status, 500);
     assert.equal(adminAuditCreateMock.mock.callCount(), 0);
     assert.equal(appAuditCreateMock.mock.callCount(), 0);
+  });
+});
+
+async function callDownload(key: string): Promise<Response> {
+  const req = mockRequest(
+    `/api/teacher/students/stu-1/archive?key=${encodeURIComponent(key)}`,
+    { method: "GET" },
+  );
+  return route.GET(req as any, { params: Promise.resolve({ id: "stu-1" }) } as any);
+}
+
+describe("GET /api/teacher/students/:id/archive", () => {
+  it("signs a presigned URL that lasts one minute, not the one-hour default", async () => {
+    presignMock.mock.mockImplementation(async () => "https://storage.example/signed");
+    const res = await callDownload("archives/stu-1/archive_2026-11-11_0a1b2c3d.zip");
+    assert.equal(res.status, 302);
+    assert.equal(presignMock.mock.callCount(), 1);
+    const options = presignMock.mock.calls[0].arguments[1] as { expiresIn?: number };
+    assert.equal(options.expiresIn, 60);
+    assert.equal(adminAuditCreateMock.mock.callCount(), 1, "the download writes its view row");
+  });
+
+  it("still downloads an archive stored under an older, named key", async () => {
+    presignMock.mock.mockImplementation(async () => "https://storage.example/signed");
+    const oldKey = "archives/stu-1/Jane_Student_2026-09-02.zip";
+    const res = await callDownload(oldKey);
+    assert.equal(res.status, 302);
+    assert.equal(presignMock.mock.calls[0].arguments[0], oldKey);
+  });
+
+  it("refuses a key outside the student's archive folder", async () => {
+    const res = await callDownload("archives/stu-2/archive_2026-11-11_0a1b2c3d.zip");
+    assert.equal(res.status, 400);
+    assert.equal(presignMock.mock.callCount(), 0);
   });
 });

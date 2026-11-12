@@ -3,8 +3,11 @@ import test from "node:test";
 import { cached } from "./cache";
 import {
   applyChatContextWriteThrough,
+  CERT_OWNER_LOOKUP_TIMEOUT_MS,
   isChatContextWrite,
   resolveChatContextInvalidation,
+  type CertificationOwners,
+  type ClassMembers,
 } from "./chat-context-write-through";
 
 // ---------------------------------------------------------------------------
@@ -115,11 +118,31 @@ test("certification create resolves to the student", () => {
   assert.deepEqual(res, { scope: "students", studentIds: [SID] });
 });
 
-test("certRequirement updateMany (no studentId anywhere) falls back to all", () => {
+// CertRequirement rows carry no studentId; they are one student's through
+// their certification. This test used to expect "all" for the shape below;
+// F2b item 8 resolves the certification instead, and the shell then looks up
+// its owner (applyChatContextWriteThrough's `owners`).
+test("certRequirement updateMany by certificationId resolves to that certification", () => {
   const res = resolveChatContextInvalidation("CertRequirement", "updateMany", {
     where: { certificationId: "c1" },
     data: { completed: true },
   }, { count: 4 });
+  assert.deepEqual(res, { scope: "certifications", certificationIds: ["c1"] });
+});
+
+test("certRequirement update resolves to the certification on the returned row", () => {
+  const res = resolveChatContextInvalidation("CertRequirement", "update", {
+    where: { id: "r1" },
+    data: { completed: true },
+  }, { id: "r1", certificationId: "c1", completed: true });
+  assert.deepEqual(res, { scope: "certifications", certificationIds: ["c1"] });
+});
+
+test("certRequirement updateMany with no certification named falls back to all", () => {
+  const res = resolveChatContextInvalidation("CertRequirement", "updateMany", {
+    where: { id: { in: ["r1", "r2"] } },
+    data: { completed: true },
+  }, { count: 2 });
   assert.deepEqual(res, { scope: "all" });
 });
 
@@ -160,14 +183,36 @@ test("resume data upsert resolves to the student (career-thread key)", () => {
   assert.deepEqual(res, { scope: "students", studentIds: [SID] });
 });
 
-test("conversation stage/title updates resolve to none (per-turn writes must not defeat the cache)", () => {
-  for (const data of [{ stage: "onboarding" }, { title: "First chat..." }, { active: false }]) {
+// A stage write used to resolve to none. It now clears the student's kept
+// dashboard slow signals only (scope "dashboard"), which still leaves Sage's
+// layers alone: the rule this test guards is unchanged.
+test("conversation stage writes clear only the student's dashboard slow signals", () => {
+  const res = resolveChatContextInvalidation("Conversation", "update", {
+    where: { id: "conv1" },
+    data: { stage: "onboarding" },
+  }, { id: "conv1", studentId: SID });
+  assert.deepEqual(res, { scope: "dashboard", studentIds: [SID] });
+});
+
+test("conversation title/active updates resolve to none (per-turn writes must not defeat the cache)", () => {
+  for (const data of [{ title: "First chat..." }, { active: false }]) {
     const res = resolveChatContextInvalidation("Conversation", "update", {
       where: { id: "conv1" },
       data,
     }, { id: "conv1", studentId: SID });
     assert.deepEqual(res, { scope: "none" }, `data=${JSON.stringify(data)}`);
   }
+});
+
+// Deleting a conversation cascades its messages away (lowering the discovery
+// turn count) and drops a summary Sage used, though the delete names neither.
+test("deleting a conversation clears its student; a delete that names none clears everyone", () => {
+  assert.deepEqual(resolveChatContextInvalidation("Conversation", "delete", { where: { id: "conv1" } },
+    { id: "conv1", studentId: SID, stage: "discovery" }), { scope: "students", studentIds: [SID] });
+  assert.deepEqual(resolveChatContextInvalidation("Conversation", "deleteMany", { where: { studentId: SID } }, { count: 3 }),
+    { scope: "students", studentIds: [SID] });
+  assert.deepEqual(resolveChatContextInvalidation("Conversation", "deleteMany", { where: { active: false } }, { count: 3 }),
+    { scope: "all" });
 });
 
 test("conversation summary write resolves to the student (prior-conversation context)", () => {
@@ -203,13 +248,13 @@ test("progression upsert invalidates the student", () => {
   assert.deepEqual(res, { scope: "students", studentIds: [SID] });
 });
 
-// Message/ProgressionEvent/Student stay unwatched on their original
-// reasoning: they are written on essentially every turn and the surfaces
-// they feed (message count, recentEvents in the bundle) are genuinely read
-// uncached. Progression was removed from this list because that second
-// claim was false for it — see the two tests above.
-test("unwatched models resolve to none (Message, ProgressionEvent, Student)", () => {
-  for (const model of ["Message", "ProgressionEvent", "Student"]) {
+// ProgressionEvent/Student stay unwatched on their original reasoning: they
+// are written on essentially every turn and the surfaces they feed are read
+// uncached. Progression was removed from this list because that second claim
+// was false for it (see the two tests above). Message left it for the
+// dashboard's kept discovery turn count; see the "dashboard" test below.
+test("unwatched models resolve to none (ProgressionEvent, Student)", () => {
+  for (const model of ["ProgressionEvent", "Student"]) {
     const res = resolveChatContextInvalidation(model, "create", { data: { studentId: SID } }, { id: "x" });
     assert.deepEqual(res, { scope: "none" }, model);
   }
@@ -247,7 +292,8 @@ test("isChatContextWrite is true only for write ops on watched models", () => {
   assert.equal(isChatContextWrite("Goal", "create"), true);
   assert.equal(isChatContextWrite("Conversation", "update"), true);
   assert.equal(isChatContextWrite("Goal", "findMany"), false);
-  assert.equal(isChatContextWrite("Message", "create"), false);
+  assert.equal(isChatContextWrite("Message", "create"), true);
+  assert.equal(isChatContextWrite("ProgressionEvent", "create"), false);
   assert.equal(isChatContextWrite(undefined, "$queryRaw"), false);
 });
 
@@ -287,4 +333,129 @@ test("applyChatContextWriteThrough never throws, even on garbage payloads", () =
   assert.doesNotThrow(() =>
     applyChatContextWriteThrough("Conversation", "update", { data: { summary: 7 } }, { studentId: 9 }),
   );
+});
+
+// ---------------------------------------------------------------------------
+// CertRequirement writes clear only the owning student (F2b item 8), and
+// clear everyone whenever the owner cannot be found.
+// ---------------------------------------------------------------------------
+
+async function survivors(owners: CertificationOwners | undefined): Promise<string[]> {
+  const kept: string[] = [];
+  for (const id of [SID, OTHER_SID]) await cached(`chat:snapshot:${id}`, 60, async () => "warm");
+  await applyChatContextWriteThrough("CertRequirement", "update", { where: { id: "r1" }, data: { completed: true } },
+    { id: "r1", certificationId: "c1" }, { certificationOwners: owners });
+  for (const id of [SID, OTHER_SID]) {
+    let recomputed = false;
+    await cached(`chat:snapshot:${id}`, 60, async () => { recomputed = true; return "fresh"; });
+    if (!recomputed) kept.push(id);
+  }
+  return kept;
+}
+
+test("a requirement tick clears the certification's owner and no one else", async () => {
+  assert.deepEqual(await survivors(async (ids) => (ids.includes("c1") ? [SID] : [])), [OTHER_SID]);
+});
+
+test("a requirement tick clears everyone when the owner lookup finds nothing, fails, or is not given", async () => {
+  assert.deepEqual(await survivors(async () => []), []);
+  assert.deepEqual(await survivors(async () => { throw new Error("lookup down"); }), []);
+  assert.deepEqual(await survivors(undefined), []);
+});
+
+// The owner lookup runs inside the writer's open transaction (db.ts awaits the
+// write-through before the write returns), so a lookup stuck on a busy admin
+// pool must not hold the write: past the bound it counts as "owner not found".
+test("a requirement tick whose owner lookup never settles returns within the bound and clears everyone", async () => {
+  const started = Date.now();
+  const kept = await survivors(() => new Promise<readonly string[]>(() => {}));
+  const elapsed = Date.now() - started;
+  assert.deepEqual(kept, []);
+  assert.ok(elapsed < CERT_OWNER_LOOKUP_TIMEOUT_MS + 500, `took ${elapsed} ms`);
+});
+
+test("a requirement tick whose owner lookup answers inside the bound still clears only the owner", async () => {
+  const slowButInTime = (ids: readonly string[]) => new Promise<readonly string[]>((resolve) => {
+    setTimeout(() => resolve(ids.includes("c1") ? [SID] : []), CERT_OWNER_LOOKUP_TIMEOUT_MS / 5);
+  });
+  assert.deepEqual(await survivors(slowButInTime), [OTHER_SID]);
+});
+
+// ---------------------------------------------------------------------------
+// F2d: the dashboard inputs F2 left unwatched.
+// ---------------------------------------------------------------------------
+
+test("a chat message clears only its student's dashboard slow signals", () => {
+  const res = resolveChatContextInvalidation("Message", "create",
+    { data: { conversationId: "conv1", studentId: SID, role: "assistant", content: "Hi" } }, { id: "m1", studentId: SID });
+  assert.deepEqual(res, { scope: "dashboard", studentIds: [SID] });
+});
+
+// A per-turn write that names no student must not fall back to clearing
+// everyone's Sage layers: it clears only the kept slow signals, for everyone.
+test("a chat message or stage write that names no student clears every student's slow signals only", () => {
+  assert.deepEqual(resolveChatContextInvalidation("Message", "create",
+    { data: { student: { connect: { id: SID } }, conversation: { connect: { id: "conv1" } }, role: "user", content: "Hi" }, select: { id: true } },
+    { id: "m2" }), { scope: "allDashboards" });
+  assert.deepEqual(resolveChatContextInvalidation("Conversation", "updateMany",
+    { where: { id: { in: ["conv1"] } }, data: { stage: "discovery" } }, { count: 1 }), { scope: "allDashboards" });
+});
+
+test("the every-dashboard fallback drops every student's slow signals and keeps Sage's layers", async () => {
+  const slow = (id: string) => `chat:snapshot:${id}:dashboard:slow`;
+  const sage = `chat:pathway:${SID}`;
+  for (const key of [slow(SID), slow(OTHER_SID), sage]) await cached(key, 60, async () => "warm");
+  await applyChatContextWriteThrough("Message", "create", { data: { student: { connect: { id: SID } } } }, { id: "m2" });
+  const reread = async (key: string) => {
+    let again = false;
+    await cached(key, 60, async () => { again = true; return "fresh"; });
+    return again;
+  };
+  assert.equal(await reread(slow(SID)), true, "a student's slow signals outlived the fallback");
+  assert.equal(await reread(slow(OTHER_SID)), true, "another student's slow signals outlived the fallback");
+  assert.equal(await reread(sage), false, "the fallback dropped Sage's chat layers");
+});
+
+test("an enrollment write clears its student, and a pathway write clears everyone", () => {
+  assert.deepEqual(resolveChatContextInvalidation("StudentClassEnrollment", "update",
+    { where: { id: "e1" }, data: { status: "archived" } }, { id: "e1", studentId: SID, classId: "k1" }),
+  { scope: "students", studentIds: [SID] });
+  assert.deepEqual(resolveChatContextInvalidation("Pathway", "update", { where: { id: "p1" }, data: { active: false } }, { id: "p1" }),
+    { scope: "all" });
+});
+
+test("a class requirement write resolves to its class, or to all when it names none", () => {
+  assert.deepEqual(resolveChatContextInvalidation("ClassRequirement", "deleteMany", { where: { classId: "k1" } }, { count: 2 }),
+    { scope: "classes", classIds: ["k1"] });
+  assert.deepEqual(resolveChatContextInvalidation("ClassRequirement", "createMany",
+    { data: [{ classId: "k1", itemType: "form", itemId: "f", title: "F" }] }, { count: 1 }),
+  { scope: "classes", classIds: ["k1"] });
+  assert.deepEqual(resolveChatContextInvalidation("ClassRequirement", "deleteMany", { where: { id: { in: ["r1"] } } }, { count: 1 }),
+    { scope: "all" });
+});
+
+async function classSurvivors(members: ClassMembers | undefined): Promise<string[]> {
+  const kept: string[] = [];
+  for (const id of [SID, OTHER_SID]) await cached(`chat:snapshot:${id}`, 60, async () => "warm");
+  await applyChatContextWriteThrough("ClassRequirement", "delete", { where: { id: "r1" } },
+    { id: "r1", classId: "k1" }, { classMembers: members });
+  for (const id of [SID, OTHER_SID]) {
+    let recomputed = false;
+    await cached(`chat:snapshot:${id}`, 60, async () => { recomputed = true; return "fresh"; });
+    if (!recomputed) kept.push(id);
+  }
+  return kept;
+}
+
+test("a class requirement write clears the enrolled students; an empty class clears no one", async () => {
+  assert.deepEqual(await classSurvivors(async (ids) => (ids.includes("k1") ? [SID] : [])), [OTHER_SID]);
+  assert.deepEqual(await classSurvivors(async () => []), [SID, OTHER_SID]);
+});
+
+test("a class requirement write clears everyone when its lookup fails, is missing, or never settles in the bound", async () => {
+  assert.deepEqual(await classSurvivors(async () => { throw new Error("lookup down"); }), []);
+  assert.deepEqual(await classSurvivors(undefined), []);
+  const started = Date.now();
+  assert.deepEqual(await classSurvivors(() => new Promise<readonly string[]>(() => {})), []);
+  assert.ok(Date.now() - started < CERT_OWNER_LOOKUP_TIMEOUT_MS + 500);
 });

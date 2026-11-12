@@ -423,7 +423,7 @@ async function claimAndCreate(
 
 export async function acceptStaffInvite(input: AcceptStaffInviteInput): Promise<{ staffId: string }> {
   const parsed = acceptStaffInviteSchema.parse(input);
-  const { hash } = hashPassword(parsed.password);
+  const { hash } = await hashPassword(parsed.password);
   const outcome = await claimAndCreate(parsed, hash);
   if (outcome.kind === "refused") throw new StaffInviteRefused(outcome.reason);
   const { invite, staffId } = outcome;

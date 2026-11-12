@@ -5,10 +5,21 @@ import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prismaAdmin } from "@/lib/db";
 import { hashPassword, invalidateSessionCache } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit";
+import {
+  MAX_PASSWORD_LENGTH,
+  MIN_PASSWORD_LENGTH,
+  PASSWORD_TOO_LONG_MESSAGE,
+  PASSWORD_TOO_SHORT_MESSAGE,
+} from "@/lib/password-policy";
 import { parseBody } from "@/lib/schemas";
 
 const teacherResetPasswordSchema = z.object({
-  newPassword: z.string().min(12, "Password must be at least 12 characters").max(200, "Password must be 200 characters or fewer"),
+  // Trimmed, as sign-in trims what the student types: an untrimmed trailing space would lock them out.
+  newPassword: z
+    .string()
+    .trim()
+    .min(MIN_PASSWORD_LENGTH, PASSWORD_TOO_SHORT_MESSAGE)
+    .max(MAX_PASSWORD_LENGTH, PASSWORD_TOO_LONG_MESSAGE),
 });
 
 // POST — reset a student's password
@@ -26,7 +37,7 @@ export const POST = withTeacherAuth(async (
     return NextResponse.json({ error: "Student not found" }, { status: 404 });
   }
 
-  const { hash } = hashPassword(newPassword);
+  const { hash } = await hashPassword(newPassword);
   // Reset tokens are own-only under RLS. After student authorization, use
   // one privileged transaction so a teacher reset actually revokes them.
   await prismaAdmin.$transaction([
@@ -34,6 +45,11 @@ export const POST = withTeacherAuth(async (
       where: { id, role: "student" },
       data: {
         passwordHash: hash,
+        // Staff typed this password, so staff know it. The student is held
+        // to the change-password screen until they pick their own. The
+        // version bump in the same write ends every session they have, so
+        // no token from before the reset can go on without the claim.
+        mustChangePassword: true,
         sessionVersion: { increment: 1 },
       },
     }),
@@ -49,7 +65,7 @@ export const POST = withTeacherAuth(async (
     action: "teacher.password.reset",
     targetType: "student",
     targetId: id,
-    summary: `Teacher reset the password for ${student.studentId}.`,
+    summary: `Teacher reset the student's password.`,
     metadata: {
       studentId: student.studentId,
     },

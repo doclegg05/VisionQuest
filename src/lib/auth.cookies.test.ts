@@ -8,7 +8,7 @@ mock.module("./db", { namedExports: { prismaAdmin: {} } });
 test("the timing dummy password never authenticates an unsupported stored hash", async () => {
   const { verifyPasswordSafeWithStatus } = await import("./auth");
   for (const stored of ["unsupported-hash", "", null, undefined]) {
-    assert.deepEqual(verifyPasswordSafeWithStatus("dummy-password-never-matches", stored), {
+    assert.deepEqual(await verifyPasswordSafeWithStatus("dummy-password-never-matches", stored), {
       valid: false, needsRehash: false,
     });
   }

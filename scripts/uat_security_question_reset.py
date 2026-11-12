@@ -62,7 +62,7 @@ def main() -> int:
             log("reset-uat: reset via classroom questions")
             page.goto(f"{BASE_URL}/forgot-password", wait_until="domcontentloaded")
             page.wait_for_load_state("networkidle")
-            page.get_by_label("Email or Student ID").fill(student_id)
+            page.get_by_label("Username or Email").fill(student_id)
             for label, answer in recovery_answers.items():
                 page.get_by_label(label).fill(answer)
             page.locator("#new-password").fill(new_password)

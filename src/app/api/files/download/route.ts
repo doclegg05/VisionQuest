@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { downloadFile, getPresignedDownloadUrl } from "@/lib/storage";
 import { isStaffRole, withAuth } from "@/lib/api-error";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
+import { recordStudentView } from "@/lib/audit";
 import { logger } from "@/lib/logger";
 import { studentLogKey } from "@/lib/log-keys";
 import { detectedFileType, safeDownloadType } from "@/lib/file-security";
@@ -24,6 +25,17 @@ export const GET = withAuth(async (session, req: Request) => {
   // admins can download any file
   if (session.role === "teacher") {
     await assertStaffCanManageStudent(session, file.studentId);
+  }
+
+  // A staff download of a student's file or signed form is a read of that
+  // student's record: write the view row before the file is handed over.
+  if (isStaffRole(session.role) && file.studentId !== session.id) {
+    await recordStudentView({
+      actorId: session.id,
+      actorRole: session.role,
+      targetStudentId: file.studentId,
+      surface: "files",
+    });
   }
 
   // Sanitize filename for Content-Disposition header (RFC 6266)

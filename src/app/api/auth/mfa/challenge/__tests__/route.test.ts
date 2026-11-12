@@ -41,11 +41,15 @@ interface StudentRow {
   mfaLastUsedCounter: number | null;
   mfaVerifiedAt: Date | null;
   mustChangePassword: boolean;
+  passwordHash: string | null;
+  demoAccount: string | null;
 }
 
 type LimiterResult = { success: boolean; remaining: number; resetTime: number; degraded: boolean };
 
 const cookieSets: { studentId: string; role: string; sessionVersion: number }[] = [];
+/** The options each session cookie was issued with, in call order. */
+const cookieOptions: unknown[] = [];
 const mfaCookieClears: number[] = [];
 
 const mockFindUnique = mock.fn() as any;
@@ -62,8 +66,9 @@ mock.module("@/lib/auth", {
     getSession: async () => null,
     verifyMfaSessionToken: mockVerifyMfaSessionToken,
     getMfaSessionToken: mockGetMfaSessionToken,
-    setSessionCookie: async (studentId: string, role: string, sessionVersion: number) => {
+    setSessionCookie: async (studentId: string, role: string, sessionVersion: number, options: unknown) => {
       cookieSets.push({ studentId, role, sessionVersion });
+      cookieOptions.push(options);
       return "fake-jwt-token";
     },
     clearMfaSessionCookie: async () => {
@@ -158,6 +163,8 @@ function makeRow(overrides: Partial<StudentRow> = {}): StudentRow {
     mfaLastUsedCounter: null,
     mfaVerifiedAt: null,
     mustChangePassword: false,
+    passwordHash: "scrypt$test-salt$test-hash",
+    demoAccount: null,
     ...overrides,
   };
 }
@@ -241,7 +248,7 @@ function challengeRequest(token: string, options: { withSessionToken?: boolean }
   return mockRequest("/api/auth/mfa/challenge", {
     method: "POST",
     body: withSessionToken ? { token, mfaSessionToken: "challenge-token" } : { token },
-    headers: { "x-forwarded-for": IP },
+    headers: { "x-forwarded-for": `${IP}, 172.70.1.9` },
   });
 }
 
@@ -256,6 +263,7 @@ function auditActions(): string[] {
 describe("POST /api/auth/mfa/challenge", () => {
   beforeEach(() => {
     cookieSets.length = 0;
+    cookieOptions.length = 0;
     mfaCookieClears.length = 0;
     mockFindUnique.mock.resetCalls();
     mockUpdate.mock.resetCalls();
@@ -303,6 +311,15 @@ describe("POST /api/auth/mfa/challenge", () => {
     assert.equal(mockRateLimit.mock.callCount(), 1);
     assert.equal(mockVerifyMfaSessionToken.mock.callCount(), 0);
     assert.equal(mockFindUnique.mock.callCount(), 0);
+  });
+
+  // The per-address bucket counted every challenge, passed or failed, at 5
+  // per 5 minutes, so the sixth member of staff signing in from one office
+  // was refused. 30 fits an office; the per-account limit below is the control.
+  it("allows one network address 30 challenge attempts per 5 minutes", async () => {
+    await challengeRoute.POST(challengeRequest("123456") as never);
+
+    assert.deepEqual(mockRateLimit.mock.calls[0].arguments, [`mfa-challenge:${IP}`, 30, 5 * 60 * 1000]);
   });
 
   it("returns 429 in plain language once the account has used its TOTP attempts", async () => {
@@ -502,10 +519,11 @@ describe("POST /api/auth/mfa/challenge", () => {
   });
 
   // This route is the other place a session is minted after a password check,
-  // so an MFA-enabled account provisioned through SPOKES intake would
-  // otherwise never be told to rotate the password staff chose for it.
-  it("reports an unrotated staff-issued password once the second factor passes", async () => {
-    installStudentStore(makeRow({ mustChangePassword: true }));
+  // so a student account with a second factor and a password staff chose
+  // would otherwise sign in without being held to the change-password screen
+  // (readiness A3). The cookie carries the claim; the response repeats it.
+  it("holds a student whose password staff set, once the second factor passes", async () => {
+    installStudentStore(makeRow({ mustChangePassword: true, role: "student" }));
     const { code } = totpFor(TOTP_SECRET);
 
     const res = await challengeRoute.POST(challengeRequest(code) as never);
@@ -513,6 +531,29 @@ describe("POST /api/auth/mfa/challenge", () => {
 
     assert.equal(res.status, 200);
     assert.equal(body.student.mustChangePassword, true);
-    assert.equal(cookieSets.length, 1, "the flag is a prompt, not a gate on the session");
+    assert.equal(cookieSets.length, 1, "the session is issued, and held to the change screen");
+    assert.deepEqual(cookieOptions, [{ mustChangePassword: true }]);
+  });
+
+  it("issues a session that is not held when there is nothing to change", async () => {
+    installStudentStore(makeRow({ role: "student" }));
+    const { code } = totpFor(TOTP_SECRET);
+
+    const res = await challengeRoute.POST(challengeRequest(code) as never);
+
+    assert.equal(res.status, 200);
+    assert.deepEqual(cookieOptions, [{ mustChangePassword: false }]);
+  });
+
+  it("never holds a staff account, even one whose row carries the flag", async () => {
+    installStudentStore(makeRow({ mustChangePassword: true }));
+    const { code } = totpFor(TOTP_SECRET);
+
+    const res = await challengeRoute.POST(challengeRequest(code) as never);
+    const body = (await res.json()) as { student: { mustChangePassword: boolean } };
+
+    assert.equal(res.status, 200);
+    assert.deepEqual(cookieOptions, [{ mustChangePassword: false }]);
+    assert.equal(body.student.mustChangePassword, false);
   });
 });

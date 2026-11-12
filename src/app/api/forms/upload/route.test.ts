@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { before, beforeEach, describe, it, mock } from "node:test";
-import { mockStudentSession } from "@/lib/test-helpers";
+import type { Session } from "@/lib/api-error";
+import { mockStudentSession, mockTeacherSession } from "@/lib/test-helpers";
 
 /**
  * Same defense-in-depth as `/api/files`: the orientation form upload writes
@@ -12,6 +13,9 @@ import { mockStudentSession } from "@/lib/test-helpers";
 const FORM_ID = "student-profile";
 
 const student = mockStudentSession();
+const teacher = mockTeacherSession();
+let currentSession: Session = student;
+const mockSyncStudentAlerts = mock.fn<(studentId: string) => Promise<void>>(async () => undefined);
 const mockUploadFile = mock.fn(async () => undefined);
 
 const mockFileUploadCreate =
@@ -19,7 +23,7 @@ const mockFileUploadCreate =
 
 mock.module("@/lib/auth", {
   namedExports: {
-    getSession: async () => student,
+    getSession: async () => currentSession,
   },
 });
 
@@ -42,7 +46,7 @@ mock.module("@/lib/storage", {
 
 mock.module("@/lib/advising", {
   namedExports: {
-    syncStudentAlerts: async () => undefined,
+    syncStudentAlerts: mockSyncStudentAlerts,
   },
 });
 
@@ -115,3 +119,55 @@ describe("POST /api/forms/upload — persisted filename", () => {
     );
   });
 });
+
+function holdSync(): () => void {
+  let release: () => void = () => undefined;
+  mockSyncStudentAlerts.mock.mockImplementation(() => new Promise<void>((resolve) => {
+    release = resolve;
+  }));
+  return () => release();
+}
+
+async function settlesWithin(work: Promise<Response>, ms: number): Promise<Response | "pending"> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const pending = new Promise<"pending">((resolve) => {
+    timer = setTimeout(() => resolve("pending"), ms);
+  });
+  const outcome = await Promise.race([work, pending]);
+  clearTimeout(timer);
+  return outcome;
+}
+
+describe("POST /api/forms/upload — alert sync", () => {
+  beforeEach(() => {
+    currentSession = student;
+    mockSyncStudentAlerts.mock.resetCalls();
+    mockFileUploadCreate.mock.mockImplementation(async () => ({ id: "file-1" }));
+  });
+
+  it("answers a student without waiting for the sync, and still starts it", async () => {
+    const release = holdSync();
+    const outcome = await settlesWithin(route.POST(uploadRequest("form.pdf") as never), 2000);
+    release();
+    await new Promise((resolve) => setImmediate(resolve));
+    if (outcome === "pending") assert.fail("the student's response waited on the alert sync");
+    assert.equal(outcome.status, 200);
+    assert.deepEqual(mockSyncStudentAlerts.mock.calls[0].arguments, [student.id]);
+  });
+
+  it("keeps a staff upload waiting for the sync, so the instructor's queue is fresh", async () => {
+    currentSession = teacher;
+    const release = holdSync();
+    const request = new FormData();
+    request.set("file", new File(["%PDF-1.7\n"], "form.pdf", { type: "application/pdf" }));
+    request.set("formId", FORM_ID);
+    request.set("studentId", student.id);
+    const work = route.POST(new Request("http://localhost:3000/api/forms/upload", { method: "POST", body: request }) as never);
+    assert.equal(await settlesWithin(work, 200), "pending", "a staff upload must await the sync");
+    release();
+    const res = await work;
+    assert.equal(res.status, 200);
+    assert.deepEqual(mockSyncStudentAlerts.mock.calls[0].arguments, [student.id]);
+  });
+});
+

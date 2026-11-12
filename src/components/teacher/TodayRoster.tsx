@@ -21,9 +21,12 @@ export default function TodayRoster({ roster }: { roster: TodayRosterEntry[] }) 
     return (
       <section className="surface-section p-5">
         <h2 className="font-display text-2xl text-[var(--ink-strong)]">Today</h2>
-        <p className="mt-3 rounded-xl border border-dashed border-[var(--border)] p-4 text-sm text-[var(--ink-muted)]">
-          No managed students in this view. Switch classes via the class switcher above.
-        </p>
+        <p className="mt-3 text-sm text-[var(--ink-muted)]">No students in this view yet. Pick another class above, or get started:</p>
+        <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-[var(--ink-strong)]">
+          <li><Link className="inline-flex min-h-11 items-center underline" href="/teacher/classes">Create or choose your class.</Link></li>
+          <li><Link className="inline-flex min-h-11 items-center underline" href="/teacher/classes">Add your students to its roster.</Link></li>
+          <li><Link className="inline-flex min-h-11 items-center underline" href="/teacher/classes">Open the class QR flyer for sign-in.</Link></li>
+        </ol>
       </section>
     );
   }

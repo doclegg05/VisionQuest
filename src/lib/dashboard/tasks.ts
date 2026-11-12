@@ -3,6 +3,7 @@ import { withAppTransaction } from "@/lib/db";
 import { badRequest, conflict, forbidden, isStaffRole, notFound, type Session } from "@/lib/api-error";
 import { buildManagedStudentWhere } from "@/lib/classroom";
 import { syncStudentAlerts } from "@/lib/advising";
+import { deferPerStudent } from "@/lib/after-response";
 import { tryLogAuditEvent } from "@/lib/audit";
 import { logger } from "@/lib/logger";
 import { parseDueDate, type TaskDetails, type TaskPatch, type TaskQuery } from "./task-schemas";
@@ -95,12 +96,26 @@ async function afterCommit(session: Session, tasks: StudentTask[], action: strin
     summary: auditSummary(action, task, assigned),
     metadata: { taskId: task.id, studentId: task.studentId, status: task.status },
   })));
+  const audited = audits.every((a) => a.audited);
+  const studentIds = [...new Set(tasks.map((task) => task.studentId))];
+  // A student's save never waits on the queue bookkeeping
+  // (src/lib/after-response.ts), so there is no sync result to report yet.
+  if (!isStaffRole(session.role)) {
+    for (const studentId of studentIds) {
+      deferPerStudent(studentId, { surface: "tasks", effect: "syncStudentAlerts" }, () => syncStudentAlerts(studentId));
+    }
+    return { audited };
+  }
+  // Staff wait, so the instructor's queue is fresh on their next fetch.
+  return { audited, alertsSynced: await syncForStaff(studentIds, action) };
+}
+async function syncForStaff(studentIds: string[], action: string): Promise<boolean> {
   let alertsSynced = true;
-  for (const studentId of new Set(tasks.map((task) => task.studentId))) {
+  for (const studentId of studentIds) {
     try { await syncStudentAlerts(studentId); }
     catch { alertsSynced = false; logger.warn("Task saved; alert synchronization failed", { action }); }
   }
-  return { audited: audits.every((a) => a.audited), alertsSynced };
+  return alertsSynced;
 }
 export async function createPersonalTask(session: Session, details: TaskDetails) {
   requireStudent(session);

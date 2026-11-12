@@ -18,7 +18,7 @@ const mockProgressUpsert = mock.fn<(args: {
 }) => Promise<unknown>>();
 const mockSubmissionFindMany = mock.fn<(args: unknown) => Promise<unknown[]>>();
 const mockSyncStudentAlerts = mock.fn<(studentId: string) => Promise<void>>();
-const mockAssertStaffCanManageStudent = mock.fn<(session: Session, studentId: string) => Promise<void>>();
+const mockAssertStaffCanManageStudent = mock.fn<(session: Session, studentId: string) => Promise<{ id: string }>>();
 
 function makeHttpError(statusCode: number, message: string) {
   const error = new Error(message) as Error & { statusCode: number };
@@ -106,7 +106,7 @@ describe("POST /api/orientation (signature guard)", () => {
     mockSubmissionFindMany.mock.mockImplementation(async () => []);
     mockProgressUpsert.mock.mockImplementation(async () => ({}));
     mockSyncStudentAlerts.mock.mockImplementation(async () => undefined);
-    mockAssertStaffCanManageStudent.mock.mockImplementation(async () => undefined);
+    mockAssertStaffCanManageStudent.mock.mockImplementation(async (_session, studentId) => ({ id: studentId }));
   });
 
   it("rejects a student completing a signature-required item with no signed form", async () => {
@@ -241,7 +241,7 @@ describe("POST /api/orientation (verification flow)", () => {
     mockSubmissionFindMany.mock.mockImplementation(async () => []);
     mockProgressUpsert.mock.mockImplementation(async () => ({}));
     mockSyncStudentAlerts.mock.mockImplementation(async () => undefined);
-    mockAssertStaffCanManageStudent.mock.mockImplementation(async () => undefined);
+    mockAssertStaffCanManageStudent.mock.mockImplementation(async (_session, studentId) => ({ id: studentId }));
   });
 
   it("stores a student's claim as pending, not completed, and flags the response", async () => {
@@ -360,5 +360,30 @@ describe("POST /api/orientation (verification flow)", () => {
     assert.equal(call.update.completed, false);
     assert.equal(call.update.verificationStatus, null);
     assert.equal(call.update.verifiedBy, null);
+  });
+
+  // Un-checking is a student write too: it must not wait on the queue.
+  it("answers a student unchecking without waiting for the alert sync", async () => {
+    let releaseSync: () => void = () => undefined;
+    mockSyncStudentAlerts.mock.mockImplementation(
+      () => new Promise<void>((resolve) => {
+        releaseSync = resolve;
+      }),
+    );
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<"timed out">((resolve) => {
+      timer = setTimeout(() => resolve("timed out"), 2000);
+    });
+    const outcome = await Promise.race([
+      route.POST(toggleRequest({ itemId: ITEM_ID, completed: false })),
+      timeout,
+    ]);
+    clearTimeout(timer);
+    releaseSync();
+    await new Promise((resolve) => setImmediate(resolve));
+
+    if (outcome === "timed out") assert.fail("the response waited on the alert sync");
+    assert.equal(outcome.status, 200);
+    assert.equal(mockSyncStudentAlerts.mock.callCount(), 1, "the sync is still started");
   });
 });

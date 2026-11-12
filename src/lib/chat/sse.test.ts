@@ -37,3 +37,18 @@ describe("parseChatSseChunk", () => {
     assert.equal(result.buffer, "");
   });
 });
+
+describe("parseChatSseChunk boundary parse", () => {
+  it("drops an event whose known fields have the wrong type", () => {
+    for (const payload of ['{"error":42}', '{"text":["a"]}', '{"done":"yes"}', '{"failure":7,"error":"x"}', "[1,2]", '"just text"']) {
+      const parsed = parseChatSseChunk(`data: ${payload}\n\n`, "");
+      assert.deepEqual(parsed.events, [], payload);
+    }
+  });
+
+  it("keeps a well-formed error event with its cause, 988 block and saved message id", () => {
+    const event = { error: "Sage is busy.", failure: "busy", crisisBlock: "\n\n988", userMessageId: "m1" };
+    const parsed = parseChatSseChunk(`data: ${JSON.stringify(event)}\n\n`, "");
+    assert.deepEqual(parsed.events, [event]);
+  });
+});

@@ -24,3 +24,20 @@ docs/superpowers/plans/2026-10-13-openrouter-test-bench.md:generic-api-key:1451
 4a31404fc02d2c168d370ba9246ec22fd7d80d5e:src/lib/intake/provision.ts:generic-api-key:91
 19a8ef35d1be168877780211c889da0e54bab98b:src/app/api/intake/webhook/route.test.ts:generic-api-key:71
 19a8ef35d1be168877780211c889da0e54bab98b:src/app/api/intake/webhook/route.test.ts:generic-api-key:101
+
+# Readiness wave 1 (#300), commit:file:rule:line as `gitleaks git` reports them.
+# Britt approved these on 2026-11-12. Each value was read at its commit and is a
+# fixture, never a credential: PASSWORD_ALPHABET is the staff-issued password
+# character set; PASTED_PASSWORD, the reset-password copy and the api-key body
+# are made-up test inputs; STUDENT_KEY is a sample studentLogKey; the
+# sentry-scrub token is a hand-typed URL segment for the route-pattern test.
+09799d3122e3f46337bd60c419de54f1e663737f:src/app/api/auth/login/__tests__/route.client-address.test.ts:generic-api-key:137
+337b78eb1d8437f4e9cec085651cc625c4a7ecf7:src/app/api/settings/api-key/route.test.ts:generic-api-key:55
+c3004d7b55f2da396b7b7462ea44f5f77df239d2:src/components/teacher/student-detail/OverviewTab.reset-password.test.tsx:generic-api-key:216
+c1c1befa9e7ef53112ce280c13a8ab72f0cb5962:src/components/teacher/student-detail/OverviewTab.reset-password.test.tsx:generic-api-key:216
+14251f0e5cf2579080ec10c4cd4b6d97d6a7899c:src/components/teacher/student-detail/OverviewTab.reset-password.test.tsx:generic-api-key:216
+aa7e82bfbce5a3840162983e9a793987cd226cc0:src/components/teacher/student-detail/OverviewTab.reset-password.test.tsx:generic-api-key:205
+87b28abf138828ec3e20fc23340f449b4255546d:src/lib/logger.alert.test.ts:generic-api-key:22
+a67cc992e8f72924a4e998685d9c33865f443623:src/lib/logger.alert.test.ts:generic-api-key:21
+a67cc992e8f72924a4e998685d9c33865f443623:src/lib/sentry-scrub.test.ts:generic-api-key:617
+a12e191f52554189e1d484827b0ad6137c379d40:src/lib/password-policy.ts:generic-api-key:26

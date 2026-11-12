@@ -210,12 +210,14 @@ export const DEMO_INSTRUCTOR_WRITE_DENY: readonly string[] = [
 
   "POST /api/sage/panel/refresh",
   "POST /api/sage/tools/propose-goal",
+  "POST /api/sage-notice",
 
   "DELETE /api/settings/api-key",
   "POST /api/settings/api-key",
   "POST /api/settings/consent",
   "DELETE /api/settings/credly",
   "POST /api/settings/credly",
+  "POST /api/settings/password",
   "POST /api/settings/profile",
   "POST /api/settings/security-questions",
 
@@ -301,6 +303,8 @@ export const DEMO_INSTRUCTOR_READ_DENY: readonly string[] = [
   "GET /api/teacher/spokes/referrals",
   "GET /api/teacher/failed-extractions",
   "GET /api/teacher/forms/responses",
+  // A bulk export of official intake answers. The route itself admits admins only; listed so the policy says so too.
+  "GET /api/teacher/forms/[templateId]/export",
   "GET /api/teacher/export/**",
   "GET /api/teacher/classes/export-packets",
   "GET /api/teacher/audit/**",

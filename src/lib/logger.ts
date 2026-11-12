@@ -1,3 +1,6 @@
+import { errorForLog } from "./log-error";
+import { numericExtra, withheldServerEvent } from "./sentry-scrub";
+
 type LogLevel = "debug" | "info" | "warn" | "error";
 
 const LEVEL_ORDER: Record<LogLevel, number> = {
@@ -58,9 +61,112 @@ function log(level: LogLevel, message: string, context?: LogContext) {
   const formatted = formatEntry(entry);
   if (level === "error" || level === "warn") {
     console.error(formatted);
+    reportAlarm(level, message, context);
   } else {
     console.log(formatted);
   }
+}
+
+// --- Alarm lines reach a person (H1, 2026-11-10) ---------------------------
+
+/** An alarm name: a snake_case identifier, as every call site writes one. */
+const ALARM_NAME = /^[a-z][a-z0-9_]{2,63}$/;
+/** Boot probes name the alarm in the message instead (src/lib/boot-probes.ts). */
+const ALARM_MESSAGE_PREFIX = "boot_probe_";
+
+/**
+ * Which warn or error lines are alarms: the `alert: "<name>"` field the call
+ * sites use (wellbeing_no_recipients, email_delivery_unconfigured, ...), or a
+ * boot_probe_* message. An `alert` value that is not an identifier is sent
+ * as `unnamed_alert` rather than as text, since text could carry anything.
+ */
+function alarmName(message: string, context: LogContext | undefined): string | undefined {
+  const alert = context?.alert;
+  if (typeof alert === "string") return ALARM_NAME.test(alert) ? alert : "unnamed_alert";
+  return message.startsWith(ALARM_MESSAGE_PREFIX) && ALARM_NAME.test(message) ? message : undefined;
+}
+
+/**
+ * What travels with an alarm: counts and flags. The type cannot hold a
+ * string, and `numericExtra` builds it by dropping everything that is not a
+ * finite number or a boolean, so a studentLogKey, an error name or free text
+ * in the log context stays in the log line. The scrub applies the same
+ * filter again to every event (src/lib/sentry-scrub.ts).
+ */
+type AlarmExtra = Record<string, number | boolean>;
+
+/** At most one report per alarm name in this long. */
+const ALARM_WINDOW_MS = 60_000;
+
+interface AlarmWindow {
+  sentAt: number;
+  heldBack: number;
+}
+
+const alarmWindows = new Map<string, AlarmWindow>();
+
+/**
+ * The alarms of the crisis path (src/lib/sage/crisis-detection.ts,
+ * src/lib/chat/crisis-scan.ts): a crisis alert that reached nobody, or was
+ * never raised. These are never held back.
+ */
+const NEVER_HELD_BACK_PREFIX = "wellbeing_";
+
+/**
+ * Decides whether this alarm is reported. An alarm can sit on a hot path
+ * (`audit_write_failed` fires on every audited read while the audit table
+ * is down), and an outage would otherwise send one event per request. At
+ * most one report per alarm name per process per minute: returns how many
+ * were held back since the last report, or undefined when this one is held
+ * back too. The count travels on the next report, so a flood that stops
+ * within its minute shows as one event; the log stream has every line.
+ *
+ * A `wellbeing_` alarm is outside the limit and is reported every time. A
+ * held-back report is only ever seen as a count on the NEXT report of the
+ * same name, and a second `wellbeing_no_recipients` in one minute is a
+ * second student whose crisis alert reached nobody: if no third followed,
+ * nobody would be told. The cost is that `wellbeing_detection_failed`,
+ * which fires on every chat message while detection is down, sends one
+ * event per message for as long as that lasts.
+ */
+function admitAlarm(name: string, now: number): number | undefined {
+  if (name.startsWith(NEVER_HELD_BACK_PREFIX)) return 0;
+  const last = alarmWindows.get(name);
+  if (last !== undefined && now - last.sentAt < ALARM_WINDOW_MS) {
+    alarmWindows.set(name, { sentAt: last.sentAt, heldBack: last.heldBack + 1 });
+    return undefined;
+  }
+  alarmWindows.set(name, { sentAt: now, heldBack: 0 });
+  return last?.heldBack ?? 0;
+}
+
+/**
+ * Sends an alarm line to Sentry as a message. With no SENTRY_DSN it returns
+ * before loading anything. The SDK is imported lazily so that scripts and
+ * any bundle that reach this logger do not load it at all unless an alarm
+ * fires; on the server it is already in memory from instrumentation.ts.
+ * The message is the alarm name, never the log message.
+ */
+function reportAlarm(level: "warn" | "error", message: string, context: LogContext | undefined): void {
+  if (!process.env.SENTRY_DSN) return;
+  const name = alarmName(message, context);
+  if (name === undefined) return;
+  const heldBack = admitAlarm(name, Date.now());
+  if (heldBack === undefined) return;
+  const extra: AlarmExtra = { ...numericExtra(context), heldBack };
+  import("@sentry/nextjs")
+    .then((Sentry) =>
+      Sentry.withScope((scope) => {
+        scope.addEventProcessor(withheldServerEvent({}));
+        scope.setTag("alert", name);
+        scope.setExtras(extra);
+        Sentry.captureMessage(name, level === "error" ? "error" : "warning");
+      }),
+    )
+    .catch((error: unknown) => {
+      // Not through `log`, which could report this failure again.
+      console.error(JSON.stringify({ level: "error", message: "alarm_report_failed", error: errorForLog(error) }));
+    });
 }
 
 export const logger = {

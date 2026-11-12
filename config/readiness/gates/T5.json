@@ -1,0 +1,10 @@
+{
+  "id": "T5",
+  "kind": "task",
+  "set": "pilot",
+  "title": "Check the counter against a real database",
+  "doneWhen": "The measured counts are in `decisions.tsv`, the counter's constants cite them, and the database reviewer trusts all three baselines.",
+  "check": {
+    "type": "pending"
+  }
+}

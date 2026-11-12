@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { prismaAdmin as prisma } from "@/lib/db";
 import { normalizeEmail, normalizeStudentId } from "@/lib/auth";
@@ -12,6 +13,39 @@ import { parseBody, forgotPasswordSchema } from "@/lib/schemas";
 import { errorForLog } from "@/lib/log-error";
 import { providerErrorText } from "@/lib/log-redaction";
 import { logger } from "@/lib/logger";
+import { getJwtSecret } from "@/lib/session-token";
+
+/**
+ * Reset requests one network address may make per window. Every caller gets
+ * the same answer, so there is no successful request to give a unit back
+ * for; 30 lets each student in a classroom of 30 ask once. The address is the
+ * hop the platform's proxy appended to `X-Forwarded-For` (src/lib/client-ip.ts).
+ */
+const NETWORK_REQUEST_LIMIT = 30;
+const NETWORK_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+
+/**
+ * Reset emails one account may be sent per hour, whatever address asks. This
+ * is the real control on filling one person's inbox: before it, only the
+ * per-network bucket stood in the way. A reset link lasts one hour and each
+ * new email cancels the link before it, so three covers a mistyped or late
+ * email without leaving a student holding only dead links.
+ */
+const ACCOUNT_EMAIL_LIMIT = 3;
+const ACCOUNT_LIMIT_WINDOW_MS = 60 * 60 * 1000;
+
+/**
+ * Limiter key for a login that names no account. Same shape as sign-in's
+ * (login/route.ts): an HMAC under the server's secret, so case and whitespace
+ * variants share one bucket and the typed login never reaches the limiter
+ * table in a form that can be guessed back.
+ */
+function unknownLoginLimiterKey(normalizedLogin: string): string {
+  const digest = createHmac("sha256", getJwtSecret())
+    .update(`forgot-password-limiter:${normalizedLogin}`)
+    .digest("hex");
+  return `forgot-password:unknown:${digest}`;
+}
 
 function getAppBaseUrl(req: NextRequest): string {
   return (process.env.APP_BASE_URL || new URL("/", req.url).toString()).replace(/\/$/, "");
@@ -20,24 +54,8 @@ function getAppBaseUrl(req: NextRequest): string {
 const GENERIC_MESSAGE =
   "If that account has an email on file, you will receive a reset link shortly. If not, contact your program staff.";
 
-export const POST = withErrorHandler(async (req: NextRequest) => {
-  const ip = clientIpBucket(req);
-  const rl = await rateLimit(`forgot-password:${ip}`, 5, 15 * 60 * 1000);
-
-  if (!rl.success) {
-    return NextResponse.json({ error: "Too many reset attempts. Please try again later." }, { status: 429 });
-  }
-
-  const body = await parseBody(req, forgotPasswordSchema);
-  const login = body.login.trim();
-
-  if (!isEmailDeliveryConfigured()) {
-    return NextResponse.json({
-      ok: true,
-      message: "Password reset email is not configured here yet. Use the classroom recovery questions below or contact your program staff.",
-    });
-  }
-
+/** The account a typed login names, and the login in the form the unknown-login bucket keys on. */
+async function findResetTarget(login: string) {
   const email = normalizeEmail(login);
   const studentId = normalizeStudentId(login);
   const student = await prisma.student.findFirst({
@@ -57,8 +75,53 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       email: true,
     },
   });
+  return { student, normalizedLogin: email };
+}
 
-  if (!student?.email) {
+/**
+ * Counts this request against the account it names and answers whether the
+ * account is still within its emails for the hour.
+ *
+ * Counted for every login, known or not, so each path makes the same limiter
+ * round trip and response time does not show which logins have an account. A
+ * real account is keyed on its id, so its email and student-ID forms share
+ * one budget. Only a real account with an email is ever sent anything, so an
+ * unknown login's bucket changes nothing it is told.
+ */
+async function countResetRequest(student: { id: string } | null, normalizedLogin: string): Promise<boolean> {
+  const unknownLoginKey = unknownLoginLimiterKey(normalizedLogin);
+  const accountRl = await rateLimit(
+    student ? `forgot-password:user:${student.id}` : unknownLoginKey,
+    ACCOUNT_EMAIL_LIMIT,
+    ACCOUNT_LIMIT_WINDOW_MS,
+  );
+  return accountRl.success;
+}
+
+export const POST = withErrorHandler(async (req: NextRequest) => {
+  const ip = clientIpBucket(req);
+  const rl = await rateLimit(`forgot-password:${ip}`, NETWORK_REQUEST_LIMIT, NETWORK_LIMIT_WINDOW_MS);
+
+  if (!rl.success) {
+    return NextResponse.json({ error: "Too many reset attempts. Please try again later." }, { status: 429 });
+  }
+
+  const body = await parseBody(req, forgotPasswordSchema);
+  const login = body.login.trim();
+
+  if (!isEmailDeliveryConfigured()) {
+    return NextResponse.json({
+      ok: true,
+      message: "Password reset email is not configured here yet. Use the classroom recovery questions below or contact your program staff.",
+    });
+  }
+
+  const { student, normalizedLogin } = await findResetTarget(login);
+  const withinAccountLimit = await countResetRequest(student, normalizedLogin);
+
+  // An account past its limit answers exactly like every other request. The
+  // link it was sent last stays live: a refused request cancels nothing.
+  if (!student?.email || !withinAccountLimit) {
     return NextResponse.json({ ok: true, message: GENERIC_MESSAGE });
   }
 

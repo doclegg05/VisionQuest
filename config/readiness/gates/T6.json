@@ -1,0 +1,14 @@
+{
+  "id": "T6",
+  "kind": "task",
+  "set": "launch",
+  "title": "First-day browser test in CI",
+  "doneWhen": "The spec passes in CI's e2e job. Removing any one of the three gates makes it fail, shown once by hand and recorded in `decisions.tsv`.",
+  "check": {
+    "type": "test",
+    "needs": "ci",
+    "files": [
+      "src/lib/readiness/first-day-journey.test.ts"
+    ]
+  }
+}

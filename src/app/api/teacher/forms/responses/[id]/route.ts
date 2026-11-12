@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { badRequest, notFound, withTeacherAuth } from "@/lib/api-error";
+import { recordStudentView } from "@/lib/audit";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import { responseReviewSchema } from "@/lib/forms/schema";
@@ -35,7 +36,14 @@ export const GET = withTeacherAuth(async (session, _req: Request, ctx: RouteCont
   if (!response) throw notFound("Response not found.");
 
   // Authorization: teacher must manage this student.
-  await assertStaffCanManageStudent(session, response.studentId);
+  const managedStudent = await assertStaffCanManageStudent(session, response.studentId);
+
+  await recordStudentView({
+    actorId: session.id,
+    actorRole: session.role,
+    targetStudentId: managedStudent.id,
+    surface: "forms",
+  });
 
   return NextResponse.json({
     response: {

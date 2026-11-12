@@ -5,6 +5,11 @@
   "title": "\"Sage is an AI and can be wrong\" under the message box, linked to the notice page",
   "doneWhen": "Component test. Reading level passes.",
   "check": {
-    "type": "pending"
+    "type": "test",
+    "files": [
+      "src/components/chat/AiCanBeWrongLine.test.tsx",
+      "src/components/chat/ChatInput.test.tsx",
+      "src/lib/about-sage/notice.test.ts"
+    ]
   }
 }

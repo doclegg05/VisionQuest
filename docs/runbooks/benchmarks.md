@@ -415,8 +415,9 @@ browser and server are available while the raw data is not.
 All four collectors run in **one** step against **one** server (the job's own
 `npm run start`, through `playwright.config.ts`). A second web server would
 double the boot cost and hand the two halves different databases. `--workers=1`
-is on that step because `/api/auth/login` rate-limits to 10 attempts per IP per
-15 minutes and these specs share one IP.
+is on that step because `/api/auth/login` allows 30 failed sign-ins per address
+and 5 per account per 15 minutes, each attempt holds its units until it is
+answered, and these specs share one address and the fixture accounts.
 
 The collection step is `continue-on-error: true`, matching the existing
 authenticated-a11y soak, so a broken collector surfaces as an `error` row in

@@ -4,10 +4,11 @@
   "set": "pilot",
   "title": "Estimated database round trips for one teacher home render",
   "doneWhen": "60 or fewer",
+  "basis": "about half of the 111 first measured, held at 60 after admin calls were added to the count",
   "check": {
     "type": "metric",
     "run": "node scripts/readiness/query-count.mjs teacher-home",
-    "baseline": 111,
+    "baseline": 114,
     "target": 60,
     "direction": "atMost",
     "unit": "round trips"

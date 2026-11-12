@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import { NextResponse } from "next/server";
 import { getSession } from "./auth";
 import type { DemoAccountKind } from "./demo/config";
@@ -5,6 +6,7 @@ import { errorForLog } from "./log-error";
 import { logger } from "./logger";
 import { rlsRoleFor } from "./rls-headers";
 import { withRlsContext, type RlsContext } from "./rls-context";
+import { routePattern, withheldServerEvent } from "./sentry-scrub";
 
 // Defined in the dependency-free rls-headers module so the proxy can use it
 // without loading this file's server imports; re-exported here as the
@@ -109,15 +111,44 @@ export function withErrorHandler<
       return await handler(...args);
     } catch (err) {
       if (err instanceof ApiError) {
+        if (err.statusCode >= 500) reportRouteError(err, args[0], err.statusCode);
         return errorResponse(err.statusCode, err.message, err.code);
       }
 
       // Name and code only: a Prisma message quotes the failed call's
       // arguments, student ids included (src/lib/log-error.ts).
       logger.error("Unhandled API error", { error: errorForLog(err) });
+      reportRouteError(err, args[0], 500);
       return errorResponse(500, "Internal server error", "INTERNAL_ERROR");
     }
   };
+}
+
+/**
+ * Sends an unexpected route failure to Sentry (H1, 2026-11-10). Before this
+ * a 500 existed only in the host's log stream. Expected failures (an
+ * ApiError under 500: validation, auth, not found, rate limits) are not
+ * reported; they are answers, not faults.
+ *
+ * The event names the route PATTERN (`routePattern`), the method and the
+ * status, and `withheldServerEvent` removes the request (URL, query string,
+ * headers, body), the breadcrumb trail and the exception message, which
+ * for a Prisma error quotes student data. No DSN, no report: the server SDK
+ * is initialised only when SENTRY_DSN is set (sentry.server.config.ts).
+ */
+function reportRouteError(err: unknown, firstArg: unknown, status: number): void {
+  if (!process.env.SENTRY_DSN) return;
+  const request = firstArg instanceof Request ? firstArg : undefined;
+  const meta = {
+    route: request ? routePattern(new URL(request.url).pathname) : undefined,
+    method: request?.method,
+    status,
+    errorCode: errorForLog(err).code,
+  };
+  Sentry.withScope((scope) => {
+    scope.addEventProcessor(withheldServerEvent(meta));
+    Sentry.captureException(err);
+  });
 }
 
 // --- Session type ---

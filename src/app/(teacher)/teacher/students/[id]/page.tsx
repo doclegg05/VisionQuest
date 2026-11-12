@@ -9,7 +9,7 @@ export default async function StudentDetailPage({
 
   return (
     <div className="page-shell">
-      <StudentDetail studentId={id} />
+      <StudentDetail key={id} studentId={id} />
     </div>
   );
 }

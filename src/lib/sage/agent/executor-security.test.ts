@@ -2,12 +2,14 @@ import assert from "node:assert/strict";
 import { before, beforeEach, describe, it, mock } from "node:test";
 import type { Session } from "@/lib/api-error";
 import { DEMO_READ_ONLY_REFUSAL } from "@/lib/demo/copy";
+import type { ToolRateLimitDecision } from "./rate-limit";
 import type { AgentTool } from "./types";
 
 const secret = "private student note / database credential";
 const execute = mock.fn(async (_args: Record<string, unknown>, _context: Parameters<AgentTool["execute"]>[1]) => ({ status: "success" as const, summary: secret }));
 const checkAccess = mock.fn(async (_session: Session, id: string) => ({ id }));
-const rateLimit = mock.fn(async () => ({ allowed: true }));
+const ALLOWED: ToolRateLimitDecision = { allowed: true, remaining: 1, resetTime: 0, limit: 1, window: "hour" };
+const rateLimit = mock.fn(async (): Promise<ToolRateLimitDecision> => ALLOWED);
 const audits: unknown[] = [];
 const logs: unknown[] = [];
 const tool: AgentTool = {
@@ -85,6 +87,28 @@ describe("agent execution security boundary", () => {
     assert.equal(audits.length, 1);
     assert.ok(!JSON.stringify(audits).includes(secret));
     assert.match(JSON.stringify(audits), /sage.tool.security_test/);
+  });
+  it("files a staff tool call on a student under that student, with the conversation in metadata", async () => {
+    await executeAgentTool({ ...options, session: { ...session, role: "teacher" }, targetStudentId: "other" });
+    const row = audits[0] as { targetType: string; targetId: string; metadata: Record<string, unknown> };
+    assert.equal(row.targetType, "student");
+    assert.equal(row.targetId, "other");
+    assert.equal(row.metadata.conversationId, "conversation");
+  });
+  it("files a rate-limited staff tool call on a student under that student", async () => {
+    rateLimit.mock.mockImplementationOnce(async () => ({ ...ALLOWED, allowed: false, remaining: 0 }));
+    await executeAgentTool({ ...options, session: { ...session, role: "teacher" }, targetStudentId: "other" });
+    const row = audits[0] as { action: string; targetType: string; targetId: string; metadata: Record<string, unknown> };
+    assert.match(row.action, /rate_limited$/);
+    assert.equal(row.targetType, "student");
+    assert.equal(row.targetId, "other");
+    assert.equal(row.metadata.conversationId, "conversation");
+  });
+  it("keeps a call that names no student under the conversation", async () => {
+    await executeAgentTool(options);
+    const row = audits[0] as { targetType: string; targetId: string };
+    assert.equal(row.targetType, "sage_conversation");
+    assert.equal(row.targetId, "conversation");
   });
   it("does not expose thrown database/provider details to the model or logs", async () => {
     execute.mock.mockImplementation(async () => { throw new Error(secret); });

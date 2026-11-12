@@ -1,4 +1,5 @@
-import { detectCrisisSignal, type CrisisDetection } from "@/lib/sage/crisis-detection";
+import { detectCrisisSignal, type CrisisDetection } from "@/lib/sage/crisis-patterns";
+import { crisisBlockForLang, type CrisisHelpLang } from "./crisis-resource-blocks";
 
 /**
  * Deterministic, model-independent crisis-resource safety net.
@@ -25,15 +26,7 @@ import { detectCrisisSignal, type CrisisDetection } from "@/lib/sage/crisis-dete
 
 const CRISIS_MARKER = /988/;
 
-export const CRISIS_RESOURCE_BLOCK =
-  "\n\nIf you're thinking about hurting yourself or feel like you can't go on, please reach out right now: call or text 988 (Suicide & Crisis Lifeline — free, 24/7). You can also talk to your instructor — they want to help. You matter.";
-
-// Spanish counterpart, appended when the crisis signal matched a Spanish
-// pattern. "Oprime 2" and texting AYUDA are the 988 Lifeline's documented
-// Spanish access paths; "instructor" stays verbatim because the
-// crisis-spanish-* redteam fixtures assert it via mustMention.
-export const CRISIS_RESOURCE_BLOCK_ES =
-  "\n\nSi estás pensando en hacerte daño o sientes que ya no puedes más, busca ayuda ahora mismo: llama al 988 y oprime 2 para español, o envía la palabra AYUDA al 988 por mensaje de texto (Línea 988 de Prevención del Suicidio y Crisis — gratis, 24/7). También puedes hablar con tu instructor — quiere ayudarte. Tú importas.";
+export { CRISIS_RESOURCE_BLOCK, CRISIS_RESOURCE_BLOCK_ES } from "./crisis-resource-blocks";
 
 /**
  * Returns the crisis resource block to append to `reply`, or null if no
@@ -58,7 +51,18 @@ export function crisisResourceBlockFor(
   detection: CrisisDetection | null,
   reply: string,
 ): string | null {
-  if (!detection?.matched) return null;
+  const lang = crisisHelpLangFor(detection);
+  if (!lang) return null;
   if (CRISIS_MARKER.test(reply)) return null;
-  return detection.lang === "es" ? CRISIS_RESOURCE_BLOCK_ES : CRISIS_RESOURCE_BLOCK;
+  return crisisBlockForLang(lang);
+}
+
+/**
+ * Which 988 block a message calls for, or null when none. The chat route
+ * sends this on the first stream event so the client can still show the
+ * block when the stream ends before the end-of-reply safety net (E2).
+ */
+export function crisisHelpLangFor(detection: CrisisDetection | null): CrisisHelpLang | null {
+  if (!detection?.matched) return null;
+  return detection.lang === "es" ? "es" : "en";
 }

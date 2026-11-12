@@ -5,6 +5,15 @@
   "title": "Counter fidelity",
   "doneWhen": "M3 is re-pinned from a normal turn, and the database reviewer trusts all three baselines.",
   "check": {
-    "type": "pending"
+    "type": "test",
+    "files": [
+      "src/lib/query-counter.test.ts",
+      "src/lib/readiness/dashboard-query-count.test.tsx",
+      "src/lib/readiness/teacher-home-query-count.test.tsx",
+      "src/lib/readiness/chat-send-query-count.test.ts",
+      "src/lib/readiness/measured-route-layers.test.ts",
+      "src/lib/readiness/unanswered-loads.test.ts",
+      "src/lib/readiness/measurement-renderer-caches.test.tsx"
+    ]
   }
 }

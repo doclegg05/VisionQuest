@@ -4,6 +4,7 @@ import { renderToString } from "react-dom/server";
 import ChatInput from "@/components/chat/ChatInput";
 import { DEMO_PRIVACY_NOTICE } from "@/lib/demo/copy";
 import { SECURITY_QUESTIONS } from "@/lib/security-questions";
+import { SAGE_NOTICE_VERSION } from "@/lib/about-sage/notice";
 
 // The student layout is the recovery-question gate. These cases pin who it
 // sends to /recovery-setup: a real student with no questions, and nobody else.
@@ -13,6 +14,14 @@ class RedirectSignal extends Error {}
 
 let session: { id: string; studentId: string; displayName: string; role: string; demoAccount?: "student" | "instructor" } | null;
 let questionKeys: string[];
+// Scopes of the student's open ConsentRecord rows (the Sage notice is one).
+let consentScopes: string[];
+const CURRENT_NOTICE = `sage_notice:${SAGE_NOTICE_VERSION}`;
+// How often each gate read the database.
+const gateReads = { securityQuestions: 0, sageNotice: 0 };
+// The Progression row the nav facts read, and how often it was read.
+let progressionRow: { state: string } | null = null;
+let progressionReads = 0;
 
 mock.module("@/lib/auth", { exports: { getSession: async () => session } });
 
@@ -24,16 +33,32 @@ mock.module("next/navigation", {
   },
 });
 
+const prismaMock = {
+  goal: { count: async () => 0 },
+  progression: { findUnique: async () => { progressionReads++; return progressionRow; } },
+  orientationProgress: { count: async () => 0 },
+  securityQuestionAnswer: {
+    findMany: async () => {
+      gateReads.securityQuestions++;
+      return questionKeys.map((questionKey) => ({ questionKey }));
+    },
+  },
+  consentRecord: {
+    findFirst: async ({ where }: { where: { studentId: string; scope: string; revokedAt: null } }) => {
+      gateReads.sageNotice++;
+      return where.studentId === session?.id && where.revokedAt === null && consentScopes.includes(where.scope)
+        ? { id: "ack" }
+        : null;
+    },
+  },
+};
+
 mock.module("@/lib/db", {
   exports: {
-    prisma: {
-      goal: { count: async () => 0 },
-      progression: { findUnique: async () => null },
-      orientationProgress: { count: async () => 0 },
-      securityQuestionAnswer: {
-        findMany: async () => questionKeys.map((questionKey) => ({ questionKey })),
-      },
-    },
+    prisma: prismaMock,
+    // The layout's nav facts are read in one transaction (getStudentShell).
+    withAppTransaction: async <T,>(work: (tx: typeof prismaMock) => Promise<T>) => work(prismaMock),
+    withAppReadTransaction: async <T,>(work: (tx: typeof prismaMock) => Promise<T>) => work(prismaMock),
   },
 });
 
@@ -45,14 +70,22 @@ mock.module("@/components/ui/NotificationProvider", {
 mock.module("@/components/progression/ProgressionProvider", {
   exports: { default: ({ children }: { children: unknown }) => children },
 });
-mock.module("@/components/ui/PageTransition", {
-  exports: { PageTransition: ({ children }: { children: unknown }) => children },
-});
 
 let Layout: typeof import("./layout").default;
+let invalidateAllChatContext: () => void;
 
 before(async () => {
   Layout = (await import("./layout")).default;
+  ({ invalidateAllChatContext } = await import("@/lib/cache"));
+});
+// A satisfied gate is kept per student (src/lib/dashboard/student-gates.ts).
+// Each case below is a different student's first visit, so start with none kept.
+beforeEach(() => {
+  invalidateAllChatContext();
+  gateReads.securityQuestions = 0;
+  gateReads.sageNotice = 0;
+  progressionRow = null;
+  progressionReads = 0;
 });
 
 async function redirectTarget(): Promise<string | null> {
@@ -69,6 +102,7 @@ describe("student layout recovery gate", () => {
   beforeEach(() => {
     session = { id: "stu-1", studentId: "student1", displayName: "Test Student", role: "student" };
     questionKeys = [];
+    consentScopes = [CURRENT_NOTICE];
   });
 
   it("sends a real student with no recovery questions to setup", async () => {
@@ -101,6 +135,7 @@ describe("student layout demo privacy notice", () => {
   beforeEach(() => {
     session = { id: "stu-1", studentId: "student1", displayName: "Test Student", role: "student" };
     questionKeys = SECURITY_QUESTIONS.map((question) => question.key);
+    consentScopes = [CURRENT_NOTICE];
   });
 
   async function renderLayoutWithChatInput(): Promise<string> {
@@ -116,5 +151,121 @@ describe("student layout demo privacy notice", () => {
 
   it("shows a real student no notice", async () => {
     assert.ok(!(await renderLayoutWithChatInput()).includes(DEMO_PRIVACY_NOTICE));
+  });
+});
+
+// The Sage notice gate (H6). Forced steps run in this order: the password
+// change (src/proxy.ts, before any page), then this notice, then recovery
+// questions. The notice page lives outside the (student) group, so the
+// redirect cannot loop.
+describe("student layout Sage notice gate", () => {
+  beforeEach(() => {
+    session = { id: "stu-1", studentId: "student1", displayName: "Test Student", role: "student" };
+    questionKeys = SECURITY_QUESTIONS.map((question) => question.key);
+    consentScopes = [];
+  });
+
+  it("sends a student who has not acknowledged the notice to it", async () => {
+    assert.equal(await redirectTarget(), "/sage-notice");
+  });
+
+  it("lets a student who acknowledged the current notice in", async () => {
+    consentScopes = [CURRENT_NOTICE];
+
+    assert.equal(await redirectTarget(), null);
+  });
+
+  it("asks again when the student acknowledged only an older notice", async () => {
+    consentScopes = ["sage_notice:2020-01-01"];
+
+    assert.equal(await redirectTarget(), "/sage-notice");
+  });
+
+  it("does not ask a demo student", async () => {
+    session = { ...session!, demoAccount: "student" };
+
+    assert.equal(await redirectTarget(), null);
+  });
+
+  it("asks for the notice before the recovery questions", async () => {
+    questionKeys = [];
+
+    assert.equal(await redirectTarget(), "/sage-notice");
+  });
+
+  it("sends a teacher or an admin to their own home without asking", async () => {
+    session = { ...session!, role: "teacher" };
+    assert.equal(await redirectTarget(), "/teacher");
+
+    session = { ...session!, role: "admin" };
+    assert.equal(await redirectTarget(), "/admin");
+
+    session = { ...session!, role: "coordinator" };
+    assert.equal(await redirectTarget(), "/coordinator");
+  });
+});
+
+// Both gates are one-time: once satisfied they stay satisfied (answers are only
+// ever replaced, in one transaction; the notice cannot be revoked through
+// self-service). So a satisfied answer is kept and an unsatisfied one is
+// checked on every request, and no kept value can hold a student at a gate or
+// let one through it early.
+describe("student layout keeps only a satisfied gate", () => {
+  beforeEach(() => {
+    session = { id: "stu-1", studentId: "student1", displayName: "Test Student", role: "student" };
+    questionKeys = SECURITY_QUESTIONS.map((question) => question.key);
+    consentScopes = [CURRENT_NOTICE];
+  });
+
+  it("checks an unacknowledged notice on every request and lets the student in once it is acknowledged", async () => {
+    consentScopes = [];
+    assert.equal(await redirectTarget(), "/sage-notice");
+    assert.equal(await redirectTarget(), "/sage-notice");
+    assert.equal(gateReads.sageNotice, 2);
+    consentScopes = [CURRENT_NOTICE];
+    assert.equal(await redirectTarget(), null);
+  });
+
+  it("checks missing recovery questions on every request and lets the student in once they are set", async () => {
+    questionKeys = [];
+    assert.equal(await redirectTarget(), "/recovery-setup");
+    assert.equal(await redirectTarget(), "/recovery-setup");
+    assert.equal(gateReads.securityQuestions, 2);
+    questionKeys = SECURITY_QUESTIONS.map((question) => question.key);
+    assert.equal(await redirectTarget(), null);
+  });
+
+  it("reads neither gate again once both are satisfied", async () => {
+    assert.equal(await redirectTarget(), null);
+    assert.equal(await redirectTarget(), null);
+    assert.deepEqual(gateReads, { securityQuestions: 1, sageNotice: 1 });
+  });
+
+  it("keeps one student's satisfied gates from another student", async () => {
+    assert.equal(await redirectTarget(), null);
+    // Student 2 has neither: student 1's kept answers must not reach them.
+    session = { id: "stu-2", studentId: "student2", displayName: "Other Student", role: "student" };
+    consentScopes = [];
+    questionKeys = [];
+    assert.equal(await redirectTarget(), "/sage-notice");
+    consentScopes = [CURRENT_NOTICE];
+    assert.equal(await redirectTarget(), "/recovery-setup");
+  });
+});
+
+// The nav facts (W1): a page load reads them fresh, even when a poll or an
+// earlier load kept them, so a kept wrong value cannot pin the nav.
+describe("student layout reads the nav facts fresh on every page load", () => {
+  beforeEach(() => {
+    session = { id: "stu-1", studentId: "student1", displayName: "Test Student", role: "student" };
+    questionKeys = SECURITY_QUESTIONS.map((question) => question.key);
+    consentScopes = [CURRENT_NOTICE];
+    progressionRow = { state: "{}" };
+  });
+
+  it("reads progression on each of two page loads", async () => {
+    assert.equal(await redirectTarget(), null);
+    assert.equal(await redirectTarget(), null);
+    assert.equal(progressionReads, 2);
   });
 });

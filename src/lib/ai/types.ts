@@ -41,6 +41,8 @@ export interface GenerationOptions {
   /** Trusted prefix boundary in the complete systemPrompt. Native Ollama may
    * split here for cache reuse; providers ignoring it retain all prompt text. */
   systemPrefixLength?: number;
+  /** Aborts the model call (a Stop or a dropped chat connection). Never retried. */
+  signal?: AbortSignal;
 }
 
 /**
@@ -150,6 +152,8 @@ export interface ToolStreamOptions {
   temperature?: number;
   /** Same complete-prompt prefix boundary as GenerationOptions. */
   systemPrefixLength?: number;
+  /** Same cancellation as GenerationOptions. */
+  signal?: AbortSignal;
 }
 
 /**

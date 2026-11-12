@@ -33,7 +33,7 @@ export const GET = withCoordinatorAuth(
     const lines: string[] = [];
 
     lines.push("# Monthly region summary");
-    lines.push(`# Region: ${rollup.regionName}`);
+    lines.push(`# Region: ${escapeCsvValue(rollup.regionName)}`);
     lines.push(`# Period: ${periodLabel}`);
     lines.push(`# Classes in region: ${rollup.classCount}`);
     lines.push("");

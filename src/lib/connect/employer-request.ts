@@ -12,6 +12,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getPlainConfigValue } from "@/lib/system-config";
+import { rateLimitBucketFor } from "@/lib/client-ip";
 import { rateLimit } from "@/lib/rate-limit";
 
 import { CONNECT_CONFIG_KEY } from "./flags-shared";
@@ -82,7 +83,8 @@ export async function resolveEmployerRequest(
 
   if (!view) {
     const guesses = await rateLimit(
-      `connect-employer-unknown:${clientIp ?? "unknown"}`,
+      // By bucket, so an IPv6 caller cannot rotate inside its /64 past this limit.
+      `connect-employer-unknown:${rateLimitBucketFor(clientIp ?? "unknown")}`,
       UNKNOWN_TOKEN_LIMIT,
       EMPLOYER_ACTION_WINDOW_MS,
     );

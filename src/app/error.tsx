@@ -1,7 +1,15 @@
 "use client";
 
-import * as Sentry from "@sentry/nextjs";
 import { useEffect } from "react";
+import { reportClientError } from "@/instrumentation-client";
+
+/**
+ * The SDK is not imported here. This file is in every page's client graph,
+ * so a static import would put the SDK in the scripts every page loads
+ * first. `reportClientError` hands the error to the reporter that
+ * src/instrumentation-client.ts starts after the page has loaded; an error
+ * caught before then is held and sent once the SDK arrives.
+ */
 
 export default function GlobalError({
   error,
@@ -11,7 +19,7 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    Sentry.captureException(error);
+    reportClientError(error);
   }, [error]);
   return (
     <main

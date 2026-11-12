@@ -5,10 +5,12 @@ import { Prisma } from "@prisma/client";
 import {
   countsByFunction,
   createQueryCounter,
+  estimateRoundTrips,
   formatQueryBreakdown,
   queryCountLine,
   summarizeQueries,
 } from "./query-counter.test-support";
+import { isMergeableWhere } from "./readiness/admin-batching";
 
 // The counter is used the way every measurement test uses it: registered as
 // the `@/lib/db` module, then reached through the real import. The types the
@@ -206,7 +208,16 @@ describe("query counter: transactions and raw queries", () => {
       counter.queries().map((q) => [q.client, q.model, q.operation, q.inInteractiveTransaction]),
       [["app", "studentTask", "count", true]],
     );
-    assert.deepEqual(counter.transactions().map((t) => [t.client, t.kind]), [["app", "interactive"]]);
+    assert.deepEqual(counter.transactions().map((t) => [t.client, t.kind]), [["app", "appTransaction"]]);
+  });
+
+  it("marks a batch transaction's queries as inside it", async () => {
+    await db.prisma.$transaction([db.prisma.goal.count(), db.prisma.goal.count()]);
+
+    const [transaction] = counter.transactions();
+    assert.ok(transaction, "no transaction was recorded");
+    assert.equal(typeof transaction.id, "number");
+    assert.deepEqual(counter.queries().map((q) => q.transaction?.id), [transaction.id, transaction.id]);
   });
 
   it("records a tagged $queryRaw and hands the fixture its SQL and values", async () => {
@@ -287,11 +298,179 @@ describe("query counter: summary", () => {
 
   it("writes the one line the readiness script reads", async () => {
     await loadGoals("s1");
+    counter.useFixtures({ "admin:student.findMany": [] });
+    await db.prismaAdmin.student.findMany({ select: { goals: true } });
+    counter.useFixtures({ "admin:student.findMany": [{ id: "s1" }] });
     await db.prismaAdmin.student.findMany({ select: { goals: true } });
 
     assert.equal(
-      queryCountLine({ path: "dashboard", cache: "cold", queries: counter.queries(), readNotExecuted: 0 }),
-      "QUERY_COUNT path=dashboard cache=cold app=1 admin=1 relationLoads=1 read=0",
+      queryCountLine({
+        path: "dashboard", cache: "cold", queries: counter.queries(), transactions: counter.transactions(), readNotExecuted: 0,
+      }),
+      "QUERY_COUNT path=dashboard cache=cold app=1 admin=2 appNested=0 adminNested=1 " +
+        "appStatements=1 adminStatements=3 appRoundTrips=4 adminRoundTrips=3 read=0",
     );
+  });
+});
+
+describe("query counter: nested loads follow the rows the call returned", () => {
+  it("counts no nested load when a fixture says the parent returns nothing", async () => {
+    counter.useFixtures({ "goal.findMany": [], "student.findUnique": null });
+    await db.prisma.goal.findMany({ include: { student: true } });
+    await db.prisma.student.findUnique({ where: { id: "s1" }, select: { goals: { select: { id: true } } } });
+
+    assert.deepEqual(counter.queries().map((q) => [q.relationLoads, q.nestedLoads]), [[1, 0], [1, 0]]);
+  });
+
+  it("counts every nested load of a call no fixture answers: unknown, not empty", async () => {
+    await db.prisma.goal.findMany({ include: { student: true } });
+    await db.prisma.certification.findFirst({ include: { requirements: { include: { template: true } } } });
+
+    assert.deepEqual(
+      counter.queries().map((q) => [q.answeredBy, q.relationLoads, q.nestedLoads]),
+      [["default", 1, 1], ["default", 2, 2]],
+    );
+  });
+
+  it("stops at a relation the result shows empty, and keeps counting where the fixture is silent", async () => {
+    counter.useFixtures({
+      "student.findMany": [{ id: "s1", goals: [] }, { id: "s2", goals: [] }],
+      "certification.findMany": [{ id: "c1" }],
+    });
+    await db.prisma.student.findMany({ include: { goals: { include: { student: true } } } });
+    await db.prisma.certification.findMany({ include: { requirements: { include: { template: true } } } });
+
+    assert.deepEqual(counter.queries().map((q) => [q.relationLoads, q.nestedLoads]), [[2, 1], [2, 2]]);
+  });
+
+  it("counts a nested load for a write, whose returned row the fixture does not model", async () => {
+    await db.prisma.goal.create({ data: { studentId: "s1", level: "bhag", content: "x" }, include: { student: true } });
+
+    assert.equal(counter.queries()[0]?.nestedLoads, 1);
+  });
+
+  it("reports nested loads per client", async () => {
+    counter.useFixtures({ "goal.findMany": [{ id: "g1" }], "admin:goal.findMany": [{ id: "g2" }] });
+    await db.prisma.goal.findMany({ include: { student: true } });
+    await db.prismaAdmin.goal.findMany({ include: { student: true, parent: true } });
+
+    const summary = summarizeQueries(counter.queries());
+    assert.deepEqual([summary.appNestedLoads, summary.adminNestedLoads], [1, 2]);
+  });
+});
+
+describe("query counter: Prisma's same-tick findUnique batch on the admin client", () => {
+  const config = (key: string) => db.prismaAdmin.systemConfig.findUnique({ where: { key }, select: { value: true } });
+
+  it("counts same-tick admin findUnique calls of one shape as one statement", async () => {
+    await Promise.all([config("a"), config("b"), config("c")]);
+
+    assert.equal(new Set(counter.queries().map((q) => q.sameTickBatch)).size, 1);
+    assert.equal(estimateRoundTrips(counter.queries(), counter.transactions()).admin.roundTrips, 1);
+  });
+
+  it("keeps calls in separate ticks, or of another shape, as separate statements", async () => {
+    await config("a");
+    await config("b");
+    await Promise.all([
+      config("c"),
+      db.prismaAdmin.systemConfig.findUnique({ where: { key: "d" } }),
+      db.prismaAdmin.student.findUnique({ where: { id: "s1" }, select: { id: true } }),
+    ]);
+
+    assert.equal(estimateRoundTrips(counter.queries(), counter.transactions()).admin.roundTrips, 5);
+  });
+
+  it("does not merge a where that is not plain values, a call with nested loads, or one in a transaction", async () => {
+    counter.useFixtures({ "admin:student.findUnique": { id: "s1" } });
+    await Promise.all([
+      db.prismaAdmin.systemConfig.findUnique({ where: { key: "a", value: { not: "x" } } }),
+      db.prismaAdmin.systemConfig.findUnique({ where: { key: "b", value: { not: "y" } } }),
+      db.prismaAdmin.student.findUnique({ where: { id: "s1" }, include: { goals: true } }),
+      db.prismaAdmin.student.findUnique({ where: { id: "s2" }, include: { goals: true } }),
+    ]);
+    await db.prismaAdmin.$transaction(async (tx) => {
+      await Promise.all([tx.systemConfig.findUnique({ where: { key: "a" } }), tx.systemConfig.findUnique({ where: { key: "b" } })]);
+    });
+
+    assert.deepEqual(counter.queries().map((q) => q.sameTickBatch), [null, null, null, null, null, null]);
+  });
+
+  it("does not merge findUnique with findUniqueOrThrow on one model", async () => {
+    counter.useFixtures({ "admin:systemConfig.findUniqueOrThrow": { value: "x" } });
+    await Promise.all([
+      db.prismaAdmin.systemConfig.findUnique({ where: { key: "a" }, select: { value: true } }),
+      db.prismaAdmin.systemConfig.findUniqueOrThrow({ where: { key: "b" }, select: { value: true } }),
+    ]);
+
+    assert.equal(estimateRoundTrips(counter.queries(), counter.transactions()).admin.roundTrips, 2);
+  });
+
+  it("does not merge a where with a second field next to the unique one", async () => {
+    await Promise.all([
+      db.prismaAdmin.goal.findUnique({ where: { id: "g1", studentId: "s1" } }),
+      db.prismaAdmin.goal.findUnique({ where: { id: "g2", studentId: "s1" } }),
+    ]);
+
+    assert.deepEqual(counter.queries().map((q) => q.sameTickBatch), [null, null]);
+  });
+
+  it("merges only a where of one @id or @unique field with a string or number value", () => {
+    assert.equal(isMergeableWhere("systemConfig", { key: "a" }), true);
+    assert.equal(isMergeableWhere("student", { id: "s1" }), true);
+    assert.equal(isMergeableWhere("systemConfig", { key: true }), false);
+    assert.equal(isMergeableWhere("systemConfig", { value: "x" }), false);
+    assert.equal(isMergeableWhere("student", { id: "s1", isActive: true }), false);
+    assert.equal(isMergeableWhere("student", {}), false);
+    assert.equal(isMergeableWhere("student", { id: { equals: "s1" } }), false);
+  });
+
+  it("never merges app-client calls, which the RLS wrapper sends in one transaction each", async () => {
+    await Promise.all([
+      db.prisma.systemConfig.findUnique({ where: { key: "a" } }),
+      db.prisma.systemConfig.findUnique({ where: { key: "b" } }),
+    ]);
+
+    assert.equal(estimateRoundTrips(counter.queries(), counter.transactions()).app.roundTrips, 8);
+  });
+});
+
+describe("query counter: round trips", () => {
+  it("costs an app call 4 (BEGIN, set_config, query, COMMIT) plus 1 per nested load, an admin call 1", async () => {
+    counter.useFixtures({ "goal.findMany": [{ id: "g1" }] });
+    await db.prisma.goal.findMany({ include: { student: true } });
+    await db.prismaAdmin.goal.count();
+
+    const estimate = estimateRoundTrips(counter.queries(), counter.transactions());
+    assert.deepEqual([estimate.app.roundTrips, estimate.admin.roundTrips], [5, 1]);
+    assert.deepEqual([estimate.app.statements, estimate.admin.statements], [2, 1]);
+  });
+
+  it("costs withAppTransaction as it runs: BEGIN, isolation level, set_config, each query, COMMIT", async () => {
+    await db.withAppTransaction(async (tx) => {
+      await tx.studentTask.count();
+      return tx.studentTask.findMany();
+    });
+
+    assert.equal(estimateRoundTrips(counter.queries(), counter.transactions()).app.roundTrips, 6);
+  });
+
+  it("costs prisma.$transaction on the app client as BEGIN and COMMIT around a wrapped call each, in both forms", async () => {
+    await db.prisma.$transaction([db.prisma.goal.count(), db.prisma.goal.count()]);
+    await db.prisma.$transaction(async (tx) => {
+      await tx.goal.count();
+      await tx.goal.count();
+    });
+
+    assert.equal(estimateRoundTrips(counter.queries(), counter.transactions()).app.roundTrips, 20);
+  });
+
+  it("costs an admin transaction as BEGIN and COMMIT around one round trip per query, in both forms", async () => {
+    await db.prismaAdmin.$transaction([db.prismaAdmin.goal.count(), db.prismaAdmin.goal.count()]);
+    await db.prismaAdmin.$transaction(async (tx) => {
+      await tx.goal.count();
+    });
+
+    assert.equal(estimateRoundTrips(counter.queries(), counter.transactions()).admin.roundTrips, 7);
   });
 });

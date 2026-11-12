@@ -1,0 +1,10 @@
+{
+  "id": "H14",
+  "kind": "task",
+  "set": "pilot",
+  "title": "The closeout removes demo files from storage",
+  "doneWhen": "A test with a stub store proves the order (keys read, rows deleted, objects removed) and that a failed removal is counted and reported. Until this lands, the owner step for the closeout says the files stay.",
+  "check": {
+    "type": "pending"
+  }
+}

@@ -3,6 +3,7 @@ import { prismaAdmin as prisma } from "@/lib/db";
 import { getMissingRequiredTables } from "@/lib/health";
 import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
+import { getSageAvailability } from "@/lib/sage-availability";
 
 export const dynamic = "force-dynamic";
 
@@ -29,13 +30,16 @@ export async function GET() {
       );
     }
 
+    const databaseLatencyMs = Date.now() - start;
+    const sage = await getSageAvailability();
     return NextResponse.json(
       {
         status: "healthy",
+        sage,
         uptime: process.uptime(),
         db: "connected",
         schema: "ready",
-        latency_ms: Date.now() - start,
+        latency_ms: databaseLatencyMs,
         timestamp: new Date().toISOString(),
       },
       { status: 200 }

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { before, beforeEach, describe, it, mock } from "node:test";
 import type { Session } from "@/lib/api-error";
 import { studentLogKey } from "@/lib/log-keys";
-import { mockRequest, mockStudentSession } from "@/lib/test-helpers";
+import { mockRequest, mockStudentSession, mockTeacherSession } from "@/lib/test-helpers";
 
 // Same bug class as review finding F26 / API-U-01 in the sibling POST route:
 // goalResourceLink.update is the durable write, and the alert sync that
@@ -150,5 +150,43 @@ describe("PATCH /api/goal-resource-links/[id]", () => {
     assert.equal(payload.student, studentLogKey(link.studentId));
     const serialized = JSON.stringify(mockWarn.mock.calls[0].arguments);
     assert.ok(!serialized.includes(link.studentId), `log line leaked the student id: ${serialized}`);
+  });
+
+  function holdSync(): () => void {
+    let release: () => void = () => undefined;
+    mockSyncStudentAlerts.mock.mockImplementation(() => new Promise<void>((resolve) => {
+      release = resolve;
+    }));
+    return () => release();
+  }
+
+  async function settlesWithin(work: Promise<Response>, ms: number): Promise<Response | "pending"> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const pending = new Promise<"pending">((resolve) => {
+      timer = setTimeout(() => resolve("pending"), ms);
+    });
+    const outcome = await Promise.race([work, pending]);
+    clearTimeout(timer);
+    return outcome;
+  }
+
+  it("answers a student without waiting for the alert sync, and still starts it", async () => {
+    const release = holdSync();
+    const outcome = await settlesWithin(patch({ status: "in_progress" }), 2000);
+    release();
+    await new Promise((resolve) => setImmediate(resolve));
+    if (outcome === "pending") assert.fail("the student's response waited on the alert sync");
+    assert.equal(outcome.status, 200);
+    assert.deepEqual(mockSyncStudentAlerts.mock.calls[0].arguments, [link.studentId]);
+  });
+
+  it("keeps a staff update waiting for the sync, so the instructor's queue is fresh", async () => {
+    currentSession = mockTeacherSession();
+    const release = holdSync();
+    const work = patch({ status: "in_progress" });
+    assert.equal(await settlesWithin(work, 200), "pending", "a staff update must await the sync");
+    release();
+    assert.equal((await work).status, 200);
+    assert.deepEqual(mockSyncStudentAlerts.mock.calls[0].arguments, [link.studentId]);
   });
 });

@@ -3,9 +3,15 @@ import "next/dist/server/node-environment-baseline";
 import { unstable_doesMiddlewareMatch as unstable_doesProxyMatch } from "next/experimental/testing/server";
 import assert from "node:assert/strict";
 import { describe, it, test } from "node:test";
+import jwt from "jsonwebtoken";
 import { NextRequest } from "next/server";
 import { config as proxyConfig, crawlerHeadersFor, proxy, PROXY_MATCHER } from "./proxy";
 import { DEMO_READ_ONLY_REFUSAL } from "@/lib/demo/copy";
+import {
+  ALLOWED_WHILE_PASSWORD_CHANGE_REQUIRED,
+  PASSWORD_CHANGE_REQUIRED_MESSAGE,
+  PUBLIC_FILES,
+} from "@/lib/password-change-gate";
 import { signToken } from "@/lib/session-token";
 
 // FERPA review W7 (2026-09-06): the two public pages that render one
@@ -375,3 +381,238 @@ test("a cross-site POST to the demo endpoints is refused", () =>
       assert.equal(proxy(request(path, { origin: "https://evil.example" })).status, 403, path);
     }
   }));
+
+// H1 privacy follow-up, item 12 (2026-11-10). The policy allowed
+// `https://*.ingest.sentry.io`. A current DSN names a host like
+// `o123.ingest.us.sentry.io`, and a CSP wildcard covers one label, so the
+// browser would have refused every report. The policy now allows the exact
+// origin the DSN names, and nothing when there is no DSN.
+describe("proxy, connect-src and the browser's error reports", () => {
+  function connectSrc(dsn: string | undefined): string {
+    const before = process.env.NEXT_PUBLIC_SENTRY_DSN;
+    if (dsn === undefined) delete process.env.NEXT_PUBLIC_SENTRY_DSN;
+    else process.env.NEXT_PUBLIC_SENTRY_DSN = dsn;
+    try {
+      const policy = proxy(request("/", {}, "GET")).headers.get("Content-Security-Policy") ?? "";
+      return policy.split("; ").find((directive) => directive.startsWith("connect-src ")) ?? "";
+    } finally {
+      if (before === undefined) delete process.env.NEXT_PUBLIC_SENTRY_DSN;
+      else process.env.NEXT_PUBLIC_SENTRY_DSN = before;
+    }
+  }
+
+  const BASE = "connect-src 'self' https://generativelanguage.googleapis.com";
+
+  it("allows the exact ingest origin of a current regional DSN", () => {
+    assert.equal(connectSrc("https://publickey@o123.ingest.us.sentry.io/456"), `${BASE} https://o123.ingest.us.sentry.io`);
+  });
+
+  it("allows the exact ingest origin of an older DSN", () => {
+    assert.equal(connectSrc("https://publickey@o123.ingest.sentry.io/456"), `${BASE} https://o123.ingest.sentry.io`);
+  });
+
+  it("adds nothing when no DSN is set", () => {
+    assert.equal(connectSrc(undefined), BASE);
+    assert.equal(connectSrc(""), BASE);
+  });
+
+  it("adds nothing for a DSN that is not an https URL", () => {
+    assert.equal(connectSrc("not a dsn"), BASE);
+    assert.equal(connectSrc("http://publickey@o123.ingest.us.sentry.io/456"), BASE);
+  });
+
+  it("never puts the DSN's key or a wildcard in the policy", () => {
+    const directive = connectSrc("https://publickey@o123.ingest.us.sentry.io/456");
+    assert.ok(!directive.includes("publickey"));
+    assert.ok(!directive.includes("*"));
+  });
+
+  // H1 third pass, item 3 (2026-11-10). `new URL` accepts `*`, `,`, `;` and
+  // `'` in a host name, and the origin went into the policy as it was parsed.
+  // A mistyped or tampered DSN could widen `connect-src` to every https host,
+  // or end the directive and start another.
+  const HOSTILE_DSNS: readonly [what: string, dsn: string][] = [
+    ["a wildcard, which would allow every https host", "https://k@*/1"],
+    ["a semicolon, which would end connect-src and start script-src", "https://k@a.com;script-src/1"],
+    ["a comma, which would start a second policy", "https://k@a.com,evil.example/1"],
+    ["a quote, which is how a CSP keyword is written", "https://k@'unsafe-inline'/1"],
+  ];
+  for (const [what, dsn] of HOSTILE_DSNS) {
+    it(`adds nothing for a DSN whose host holds ${what}`, () => {
+      assert.equal(connectSrc(dsn), BASE);
+    });
+  }
+
+  it("adds nothing for a wildcard subdomain, a host with one label, an IPv6 host or a trailing dot", () => {
+    for (const dsn of ["https://k@*.ingest.sentry.io/1", "https://k@localhost/1", "https://k@[::1]/1", "https://k@o123.ingest.us.sentry.io./456"]) {
+      assert.equal(connectSrc(dsn), BASE, dsn);
+    }
+  });
+
+  it("adds nothing for a data: URL", () => {
+    assert.equal(connectSrc("data:text/plain,https://o123.ingest.us.sentry.io"), BASE);
+  });
+
+  it("keeps a numeric port, and writes the host in lower case", () => {
+    assert.equal(connectSrc("https://publickey@O123.Ingest.US.sentry.io:8443/456"), `${BASE} https://o123.ingest.us.sentry.io:8443`);
+  });
+
+  it("whatever the DSN, the directive holds only its own two sources and at most one https origin", () => {
+    const dsns = [...HOSTILE_DSNS.map(([, dsn]) => dsn), "https://publickey@o123.ingest.us.sentry.io/456", "https://k@a.com;script-src%20*/1", "not a dsn"];
+    for (const dsn of dsns) {
+      assert.match(connectSrc(dsn), /^connect-src 'self' https:\/\/generativelanguage\.googleapis\.com(?: https:\/\/[a-z0-9.-]+(?::\d+)?)?$/, dsn);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The forced password change
+//
+// Staff set a student's first password and every reset, so until the student
+// picks a new one a staff member knows it. A session for such an account
+// carries a signed `mustChangePassword` claim, and this is the one layer that
+// sees every request: pages are sent to the change screen and API routes
+// answer 403, apart from the short list in src/lib/password-change-gate.ts.
+// A layout redirect would not do; it never runs for an API route.
+// ---------------------------------------------------------------------------
+
+function heldStudentCookie(): Record<string, string> {
+  return sessionCookie(signToken("held-student", "student", 3, { mustChangePassword: true }));
+}
+
+describe("proxy, a session that must change its password", () => {
+  it("sends a page to the change screen", () =>
+    withDemoSwitch("off", () => {
+      for (const path of ["/dashboard", "/settings", "/chat", "/recovery-setup", "/teacher", "/credentials/someone", "/goals/abc.png"]) {
+        const res = proxy(request(path, heldStudentCookie(), "GET"));
+        assert.equal(res.status, 307, path);
+        assert.equal(res.headers.get("location"), "https://vq.example/change-password", path);
+      }
+    }));
+
+  it("answers a form post to a page with a redirect the browser follows as a GET", () =>
+    withDemoSwitch("off", () => {
+      const res = proxy(request("/dashboard", { ...SAME_ORIGIN, ...heldStudentCookie() }, "POST"));
+      assert.equal(res.status, 303);
+      assert.equal(res.headers.get("location"), "https://vq.example/change-password");
+    }));
+
+  it("refuses an API read with 403 and the PASSWORD_CHANGE_REQUIRED code", () =>
+    withDemoSwitch("off", async () => {
+      for (const path of ["/api/goals", "/api/chat/history", "/api/notifications/stream", "/api/files/abc.png", "/api/settings/security-questions"]) {
+        const res = proxy(request(path, heldStudentCookie(), "GET"));
+        assert.equal(res.status, 403, path);
+        assert.deepEqual(await res.json(), { error: PASSWORD_CHANGE_REQUIRED_MESSAGE, code: "PASSWORD_CHANGE_REQUIRED" }, path);
+      }
+    }));
+
+  it("refuses an API write with the same answer", () =>
+    withDemoSwitch("off", async () => {
+      for (const [path, method] of [
+        ["/api/chat/send", "POST"],
+        ["/api/forms/sign", "POST"],
+        ["/api/orientation/complete", "POST"],
+        ["/api/settings/security-questions", "POST"],
+        ["/api/settings/password", "PUT"],
+        ["/api/auth/session", "POST"],
+      ] as const) {
+        const res = proxy(request(path, { ...SAME_ORIGIN, ...heldStudentCookie() }, method));
+        assert.equal(res.status, 403, `${method} ${path}`);
+        assert.equal((await res.json()).code, "PASSWORD_CHANGE_REQUIRED", `${method} ${path}`);
+      }
+    }));
+
+  it("answers a cross-site write with the origin refusal, not this one", () =>
+    withDemoSwitch("off", async () => {
+      const res = proxy(request("/api/settings/password", { origin: "https://evil.example", ...heldStudentCookie() }));
+      assert.equal(res.status, 403);
+      assert.deepEqual(await res.json(), { error: "Forbidden: origin mismatch." });
+    }));
+
+  it("passes every request on the list", () =>
+    withDemoSwitch("off", () => {
+      for (const entry of ALLOWED_WHILE_PASSWORD_CHANGE_REQUIRED) {
+        const [method = "", path = ""] = entry.split(" ");
+        const res = proxy(request(path, { ...SAME_ORIGIN, ...heldStudentCookie() }, method));
+        assert.equal(res.status, 200, entry);
+      }
+    }));
+
+  it("passes the files in public/", () =>
+    withDemoSwitch("off", () => {
+      for (const file of PUBLIC_FILES) {
+        assert.equal(proxy(request(file, heldStudentCookie(), "GET")).status, 200, file);
+      }
+    }));
+
+  it("still gives the change route the student's own RLS headers", () =>
+    withDemoSwitch("off", () => {
+      const res = proxy(request("/api/settings/password", { ...SAME_ORIGIN, ...heldStudentCookie() }));
+      assert.equal(res.status, 200);
+      assert.equal(forwardedHeader(res, "x-vq-user-id"), "held-student");
+      assert.equal(forwardedHeader(res, "x-vq-role"), "student");
+      assert.equal(forwardedHeader(res, "x-vq-student-id"), "held-student");
+    }));
+
+  it("holds whatever token carries the claim, since the claim is all the proxy can see", () =>
+    withDemoSwitch("off", () => {
+      const cookie = sessionCookie(signToken("staff-1", "teacher", 1, { mustChangePassword: true }));
+      assert.equal(proxy(request("/api/teacher/students", cookie, "GET")).status, 403);
+      assert.equal(proxy(request("/teacher", cookie, "GET")).headers.get("location"), "https://vq.example/change-password");
+    }));
+});
+
+describe("proxy, sessions with nothing to change", () => {
+  it("leaves a student with no claim alone", () =>
+    withDemoSwitch("off", () => {
+      const cookie = sessionCookie(signToken("student-1", "student", 1, { mustChangePassword: false }));
+      assert.equal(proxy(request("/dashboard", cookie, "GET")).status, 200);
+      assert.equal(proxy(request("/api/goals", cookie, "GET")).status, 200);
+      assert.equal(proxy(request("/api/chat/send", { ...SAME_ORIGIN, ...cookie })).status, 200);
+    }));
+
+  it("leaves staff alone", () =>
+    withDemoSwitch("off", () => {
+      for (const role of ["teacher", "admin", "coordinator"]) {
+        const cookie = sessionCookie(signToken(`${role}-1`, role, 1, { mustChangePassword: false }));
+        assert.equal(proxy(request("/teacher", cookie, "GET")).status, 200, role);
+        assert.equal(proxy(request("/api/teacher/students", cookie, "GET")).status, 200, role);
+      }
+    }));
+
+  it("leaves both kinds of demo session alone", () =>
+    withDemoSwitch("on", () => {
+      const student = sessionCookie(signToken("demo-student-id", "student", 1, { demo: "student", mustChangePassword: false }));
+      assert.equal(proxy(request("/dashboard", student, "GET")).status, 200);
+      assert.equal(proxy(request("/api/goals", { ...SAME_ORIGIN, ...student })).status, 200);
+      assert.equal(proxy(request("/api/teacher/sage-snippets", demoInstructorCookie(), "GET")).status, 200);
+    }));
+
+  // The decision for a token signed before the claim existed. It has no key,
+  // so the proxy reads it as "nothing to change" and passes it: refusing it
+  // here would sign every person out on the day this ships. It is not let in.
+  // getSession() ends any session whose claim and account row disagree, so
+  // for an account that must change its password this token is no session at
+  // all once a handler or a page asks (src/lib/auth.password-change.test.ts).
+  it("passes a token signed before the claim existed, and leaves it to getSession", () =>
+    withDemoSwitch("off", () => {
+      const old = jwt.sign({ sub: "student-1", role: "student", sv: 1 }, DEMO_TEST_JWT_SECRET, {
+        expiresIn: "7d",
+        algorithm: "HS256",
+      });
+      assert.equal(proxy(request("/dashboard", sessionCookie(old), "GET")).status, 200);
+      assert.equal(proxy(request("/api/goals", sessionCookie(old), "GET")).status, 200);
+    }));
+
+  it("treats a token whose claim is not exactly true as no session at all", () =>
+    withDemoSwitch("off", () => {
+      const forged = jwt.sign({ sub: "student-1", role: "student", sv: 1, mustChangePassword: "no" }, DEMO_TEST_JWT_SECRET, {
+        expiresIn: "7d",
+        algorithm: "HS256",
+      });
+      const page = proxy(request("/dashboard", sessionCookie(forged), "GET"));
+      assert.equal(page.status, 307);
+      assert.equal(page.headers.get("location"), "https://vq.example/");
+      assert.equal(forwardedHeader(proxy(request("/api/goals", sessionCookie(forged), "GET")), "x-vq-user-id"), null);
+    }));
+});

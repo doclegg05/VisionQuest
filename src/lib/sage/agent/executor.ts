@@ -123,8 +123,7 @@ export async function executeAgentTool(
       actorId: session.id,
       actorRole: session.role,
       action: `sage.tool.${toolName}.rate_limited`,
-      targetType: "sage_conversation",
-      targetId: conversationId,
+      ...auditTarget(conversationId, targetStudentId),
       summary: `Sage tool "${toolName}" blocked by rate limit (${rateDecision.limit}/${rateDecision.window}).`,
       metadata: {
         callId,
@@ -132,6 +131,7 @@ export async function executeAgentTool(
         limit: rateDecision.limit,
         window: rateDecision.window,
         resetTime: rateDecision.resetTime,
+        conversationId,
         targetStudentId: targetStudentId ?? null,
       },
     }).catch((err) => {
@@ -167,12 +167,12 @@ export async function executeAgentTool(
       actorId: session.id,
       actorRole: session.role,
       action: `sage.tool.${toolName}`,
-      targetType: "sage_conversation",
-      targetId: conversationId,
+      ...auditTarget(conversationId, targetStudentId),
       summary: `Sage tool "${toolName}" → ${result.status}.`,
       metadata: {
         callId,
         status: result.status,
+        conversationId,
         targetStudentId: targetStudentId ?? null,
         actionKind: result.action?.action ?? null,
       },
@@ -193,6 +193,18 @@ export async function executeAgentTool(
       "Tool failed unexpectedly.",
     );
   }
+}
+
+/**
+ * Which row a tool call's audit event is filed under. A call that acts on a
+ * student is filed under that student, so a per-student audit read finds it;
+ * otherwise it stays under the conversation. The conversation id always goes
+ * in metadata too.
+ */
+function auditTarget(conversationId: string, targetStudentId?: string) {
+  return targetStudentId
+    ? { targetType: "student", targetId: targetStudentId }
+    : { targetType: "sage_conversation", targetId: conversationId };
 }
 
 /**

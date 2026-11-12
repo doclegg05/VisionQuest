@@ -5,6 +5,41 @@ import { prisma } from "./db";
 import { ALL_INACTIVITY_ALERT_TYPES } from "./inactivity";
 import { getPlacementBridgeScope, PLACEMENT_ALERT_TYPE } from "./placement-bridge";
 
+/**
+ * The alert types the sync loads, so it can respect a teacher's dismiss or
+ * snooze and resolve an open alert it no longer wants. It must equal the set
+ * of types the sync can write (pinned by advising-sync-alert-types.test.ts):
+ * a type missing here is reopened after every dismiss and never resolved.
+ */
+export const SYNC_ALERT_TYPES = [
+  "overdue_task",
+  "missed_appointment",
+  "career_inactive",
+  "certification_stalled",
+  "certification_unverified",
+  "goal_needs_resource",
+  "goal_resource_stale",
+  "goal_review_pending",
+  "goal_platform_stale",
+  "goal_missing_confirmed",
+  "goal_missing_monthly",
+  "goal_review_stale",
+  "goal_unconfirmed",
+  "orientation_form_missing",
+  "orientation_form_pending_review",
+  "orientation_form_revision_needed",
+  "orientation_item_incomplete",
+  "orientation_verification_pending",
+  "goal_stale",
+  "orientation_not_started",
+  "orientation_overdue",
+  "motivation_declining",
+  "profile_birthdate_missing",
+  "requirement_noncompliant",
+  PLACEMENT_ALERT_TYPE,
+  ...ALL_INACTIVITY_ALERT_TYPES,
+] as const;
+
 export async function loadStudentAlertSyncContext(studentId: string, now: Date) {
   const [tasks, appointments, studentSignals, orientationItems, existing, recentMoodEntries] = await prisma.$transaction([
     prisma.studentTask.findMany({
@@ -217,35 +252,7 @@ export async function loadStudentAlertSyncContext(studentId: string, now: Date) 
       where: {
         studentId,
         status: { in: ["open", "snoozed", "dismissed"] },
-        type: {
-          in: [
-            "overdue_task",
-            "missed_appointment",
-            "career_inactive",
-            "certification_stalled",
-            "certification_unverified",
-            "goal_needs_resource",
-            "goal_resource_stale",
-            "goal_review_pending",
-            "goal_missing_confirmed",
-            "goal_missing_monthly",
-            "goal_review_stale",
-            "goal_unconfirmed",
-            "orientation_form_missing",
-            "orientation_form_pending_review",
-            "orientation_form_revision_needed",
-            "orientation_item_incomplete",
-            "orientation_verification_pending",
-            "goal_stale",
-            "orientation_not_started",
-            "orientation_overdue",
-            "motivation_declining",
-            "profile_birthdate_missing",
-            "requirement_noncompliant",
-            PLACEMENT_ALERT_TYPE,
-            ...ALL_INACTIVITY_ALERT_TYPES,
-          ],
-        },
+        type: { in: [...SYNC_ALERT_TYPES] },
       },
       select: { id: true, alertKey: true, status: true, snoozedUntil: true },
     }),

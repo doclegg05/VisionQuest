@@ -1,3 +1,4 @@
+import { assertLocalDemoTarget, isDemoLocalOnlyRequired } from "./demo-local-only";
 import { buildLocalAiHeaders } from "./local-auth";
 import type { LocalAIAuthConfig } from "./types";
 
@@ -28,6 +29,9 @@ async function fetchWithTimeout(
     return await fetch(url, {
       ...init,
       signal: controller.signal,
+      // With the cloud AI block on, a redirect must not carry the saved
+      // credentials on to another host.
+      ...(isDemoLocalOnlyRequired() ? { redirect: "error" as const } : {}),
     });
   } finally {
     clearTimeout(timer);
@@ -163,6 +167,12 @@ export async function checkOllamaHealth(
 
   let headers: Record<string, string>;
   try {
+    // The probe below carries the saved bearer or Cloudflare Access
+    // credentials. With the cloud AI block on they go to the approved origin
+    // only; this throws before any request otherwise, and is a no-op with the
+    // block off. detectModelCapabilities calls this function first, so it is
+    // covered by the same check.
+    assertLocalDemoTarget(normalizedBaseUrl, derivedOptions.model ?? "");
     headers = buildLocalAiHeaders(derivedOptions.authConfig);
   } catch (err) {
     return {

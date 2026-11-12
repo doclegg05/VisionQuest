@@ -10,6 +10,7 @@ import { LogoPlate } from "@/components/ui/LogoPlate";
 import { DemoEntryButtons } from "./DemoEntryButtons";
 import { lookupErrorMessage } from "./error-message-lookup";
 import { GOOGLE_BRAND_COLORS } from "./google-brand";
+import { LOGIN_FIELD_LABEL } from "./login-label";
 
 const ERROR_MESSAGES: Record<string, string> = {
   oauth_not_configured: "Google sign-in is not set up here. Use the form below to sign in.",
@@ -44,6 +45,20 @@ function OrDivider() {
       <span className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--ink-muted)]">or</span>
       <div className="h-px flex-1 bg-[var(--border)]" />
     </div>
+  );
+}
+
+/**
+ * A server error under the form. The text sits in its own span so a long,
+ * multi-sentence message wraps inside the box on a 375px screen, and the icon
+ * keeps its size beside it.
+ */
+export function AuthErrorLine({ message }: { message: string }) {
+  return (
+    <p role="alert" className="flex items-start gap-2 rounded-2xl bg-danger-soft px-4 py-3 text-sm text-danger">
+      <WarningCircle size={20} weight="bold" aria-hidden="true" className="shrink-0" />
+      <span className="min-w-0 break-words">{message}</span>
+    </p>
   );
 }
 
@@ -167,7 +182,7 @@ function AuthForm({ googleAuthEnabled, demoEnabled }: AuthPageClientProps) {
   return (
     <main id="main-content" className="relative min-h-screen px-3 py-3 sm:px-4 sm:py-4 md:px-6 md:py-6">
       <div className="mx-auto grid min-h-[calc(100vh-1.5rem)] max-w-7xl gap-4 lg:min-h-[calc(100vh-2rem)] lg:grid-cols-[1.15fr_0.85fr] lg:gap-6">
-        <section className="auth-hero-panel relative overflow-hidden rounded-3xl border border-white/10 p-5 text-white sm:p-7 md:p-10 lg:p-12">
+        <section className="auth-hero-panel order-2 relative overflow-hidden rounded-3xl border border-white/10 p-5 text-white sm:p-7 md:p-10 lg:order-1 lg:p-12">
           <div className="relative flex h-full flex-col">
             <div className="max-w-2xl">
               <BrandLockup
@@ -233,7 +248,7 @@ function AuthForm({ googleAuthEnabled, demoEnabled }: AuthPageClientProps) {
           </div>
         </section>
 
-        <section className="panel panel-strong flex items-start rounded-3xl p-4 sm:p-5 md:p-8 lg:items-center">
+        <section className="panel panel-strong order-1 flex items-start rounded-3xl p-4 sm:p-5 md:p-8 lg:order-2 lg:items-center">
           <div className="w-full">
             <div className="mb-7 sm:mb-8">
               <p className="page-eyebrow text-[var(--ink-muted)]">Portal access</p>
@@ -288,12 +303,7 @@ function AuthForm({ googleAuthEnabled, demoEnabled }: AuthPageClientProps) {
                   </p>
                 )}
 
-                {error && (
-                  <p role="alert" className="flex items-start gap-2 rounded-2xl bg-danger-soft px-4 py-3 text-sm text-danger">
-                    <WarningCircle size={20} weight="bold" aria-hidden="true" className="shrink-0" />
-                    {error}
-                  </p>
-                )}
+                {error && <AuthErrorLine message={error} />}
 
                 <button
                   type="submit"
@@ -319,7 +329,7 @@ function AuthForm({ googleAuthEnabled, demoEnabled }: AuthPageClientProps) {
             ) : (
               <form onSubmit={handleSubmit} className="space-y-4" aria-label="Sign in">
                 <div>
-                  <label htmlFor="studentId" className="mb-1.5 block text-sm font-medium text-[var(--ink-strong)]">Username or Email</label>
+                  <label htmlFor="studentId" className="mb-1.5 block text-sm font-medium text-[var(--ink-strong)]">{LOGIN_FIELD_LABEL}</label>
                   <input
                     id="studentId"
                     type="text"
@@ -346,12 +356,7 @@ function AuthForm({ googleAuthEnabled, demoEnabled }: AuthPageClientProps) {
                   />
                 </div>
 
-                {error && (
-                  <p role="alert" className="flex items-start gap-2 rounded-2xl bg-danger-soft px-4 py-3 text-sm text-danger">
-                    <WarningCircle size={20} weight="bold" aria-hidden="true" className="shrink-0" />
-                    {error}
-                  </p>
-                )}
+                {error && <AuthErrorLine message={error} />}
 
                 <button
                   type="submit"
@@ -396,10 +401,6 @@ function AuthForm({ googleAuthEnabled, demoEnabled }: AuthPageClientProps) {
                   Sign in with Google
                 </a>
               </>
-            ) : !mfaRequired && !demoEnabled ? (
-              <div className="mt-5 rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3 text-sm text-[var(--ink-muted)]">
-                Google sign-in is not enabled in this environment. Use the sign-in form above.
-              </div>
             ) : null}
 
             {!demoEnabled && (
@@ -417,6 +418,12 @@ function AuthForm({ googleAuthEnabled, demoEnabled }: AuthPageClientProps) {
                   Staff? Register here
                 </a>
               )}
+              <a
+                href="/about-sage"
+                className="inline-flex min-h-11 items-center text-sm font-medium text-success transition-colors hover:text-[var(--ink-strong)] hover:underline"
+              >
+                About Sage
+              </a>
               <div className="mt-1 flex flex-wrap items-center justify-center gap-4 sm:mt-2 sm:gap-5">
                 <LogoPlate>
                   <Image src="/wvae-logo.png" alt="WVAE Logo" width={80} height={40} className="object-contain" />

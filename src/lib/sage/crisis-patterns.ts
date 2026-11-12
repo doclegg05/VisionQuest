@@ -1,0 +1,513 @@
+/**
+ * The crisis patterns and the scan that reads them, with no server imports,
+ * so the chat in the browser can run the same check (E9b). The server module
+ * crisis-detection.ts re-exports these unchanged: one pattern list, one
+ * scan, used by staff alerting, the 988 block and the chat alike.
+ */
+
+import { RESIDUAL_CRISIS_PATTERNS } from "./crisis-patterns-residual";
+
+export type CrisisCategory = "self_harm" | "harm_others" | "abuse";
+export type CrisisLang = "en" | "es";
+
+export interface CrisisPattern {
+  category: CrisisCategory;
+  pattern: RegExp;
+  /**
+   * Language of the phrase family. Used ONLY to localize the student-facing
+   * 988 resource block (src/lib/chat/crisis-safety-net.ts) — staff alerting
+   * and routing are language-independent. Omitted = English.
+   */
+  lang?: CrisisLang;
+}
+
+// Phrase-level, word-boundary matched, case-insensitive. Phrases (not bare
+// words) keep false positives down — e.g. we match "want to die" but not the
+// idiom "dying to", and "kill myself" but not "killer deal". Tunable.
+const CRISIS_PATTERNS: CrisisPattern[] = [
+  { category: "self_harm", pattern: /\b(kill(ing)?\s+myself|killed\s+myself)\b/i },
+  { category: "self_harm", pattern: /\b(end(ing)?\s+(my\s+life|it\s+all)|take\s+my\s+(own\s+)?life)\b/i },
+  { category: "self_harm", pattern: /\bsuicid(e|al)\b/i },
+  { category: "self_harm", pattern: /\b(want|going|need)\s+to\s+die\b/i },
+  { category: "self_harm", pattern: /\b(wish\s+i\s+(was|were)\s+dead|better\s+off\s+dead|no\s+reason\s+to\s+(live|be\s+here)|don'?t\s+want\s+to\s+(live|be\s+here)|can'?t\s+go\s+on)\b/i },
+  // Passive ideation phrased around absence rather than death — "better off
+  // without me" / "if I just disappeared". Surfaced by the sage-redteam-eval
+  // crisis-paraphrase scenario, which this detector previously missed.
+  //
+  // GUARD (B1b): "better off without me ON THE TEAM / IN the group project" is
+  // a statement about a group, and it is ordinary talk for a student who feels
+  // like a burden in a class or at work. The exemption is only the locative
+  // frame — a following on/in/at + determiner — so the pinned rows "everyone
+  // would be better off without me" and "my kids would be better off without
+  // me" (which end there) keep alerting. KNOWN LIMIT, recall-first and
+  // recorded: "the class would be better off without me in it" is now silent,
+  // and that sentence can be a disclosure. It is the price of the guard, and
+  // the guard exists because the unguarded form fires on a real work-stress
+  // register this population uses weekly.
+  { category: "self_harm", pattern: /\b(better\s+off\s+(without\s+me\b(?!\s+(?:on|in|at)\s+(?:the|this|that|my|our)\b)|if\s+i\s+(just\s+)?disappeared)|want\s+to\s+(just\s+)?disappear)\b/i },
+  // The verb list is spelled out rather than suffixed, so the PROGRESSIVE form
+  // of every member is covered. The old alternation offered only "ting" or "t"
+  // after the stem, which happens to spell "cutting" and nothing else: "hurting
+  // myself" and "harming myself" were both verified misses, and they are the
+  // ordinary way a student describes an act that is still going on ("i keep
+  // hurting myself", "i been harming myself"). "cuting" is accepted as the
+  // predictable single-t typo of the one member whose progressive doubles.
+  { category: "self_harm", pattern: /\b((?:hurt|harm|cut)(?:t?ing|t)?\s+myself|self[-\s]?harm(ing)?)\b/i },
+
+  // --- Informal register (VQ-R-004). The patterns above all require formal
+  // "want to" constructions, but the product targets adults at a ~6th-grade
+  // reading level who text in contractions and euphemism. Every phrase in
+  // crisis-detection-informal.test.ts was a verified MISS before these entries.
+  // Same recall-first policy as the rest of this list; the companion test also
+  // pins the false-positive guards ("wanna die my hair", "took my medication"),
+  // because an alert stream staff learn to ignore is a dead safety net.
+  // Contractions of the die/disappear family.
+  // The "die my hair" exemption is the dye homophone and must end at a word
+  // boundary: without the trailing \b it also swallowed "die my hairbrush …",
+  // suppressing a real disclosure because the next word merely starts with
+  // "hair".
+  { category: "self_harm", pattern: /\b(wanna|gonna|needa)\s+die\b(?!\s+my\s+hair\b)/i },
+  { category: "self_harm", pattern: /\bdon'?t\s+wanna\s+(live|be\s+here)\b/i },
+  { category: "self_harm", pattern: /\bwanna\s+(just\s+)?disappear\b/i },
+  // Filter-evading euphemism, common in online/text register.
+  { category: "self_harm", pattern: /\bunaliv(e|ed|ing)\b/i },
+  // Abbreviations. "kys" ("kill yourself") is the abbreviation students
+  // actually type; the entry here previously pinned "ksy", a transposition of
+  // it, so the real form was a verified MISS while a typo was guarded.
+  //
+  // "kms" is also kilometres, and this entry carries no lang tag — so
+  // "caminé 5 kms hoy" served a Spanish speaker the ENGLISH 988 block, the
+  // file's only cross-language leak. Two narrow guards, both on senses that
+  // are unambiguously distance: a digit immediately before (with or without a
+  // space), and a following "away"/"from". Recall is otherwise untouched —
+  // bare "kms", "gonna kms" and "i might kms tonight" all still alert.
+  //
+  // THE DISTANCE GUARDS MUST HOLD IN BOTH LANGUAGES, and the first attempt at
+  // that failed for a reason worth writing down: it ended its Spanish lookahead
+  // with \b, and JS \b is ASCII-only, so it cannot assert a boundary after "í".
+  // "a unos kms de aquí" only stayed silent because the QUANTITY lookbehind
+  // caught it — the lookahead was dead code, and "queda a kms de aquí" (no
+  // quantity word) still alerted, with lang "en", serving a Spanish speaker the
+  // ENGLISH 988 block. That is a fixture passing for the wrong reason, the exact
+  // hazard the 2026-08-21 review named. The remedy is this file's own,
+  // documented 200 lines down for the Spanish block: end on
+  // (?![\wáéíóúüñ]) instead of \b.
+  //
+  // Three guards now, each on a sense that is unambiguously distance:
+  //
+  //   1. QUANTITY BEFORE. "a unos/unas/pocos/pocas/varios/varias kms" and the
+  //      Spanish number words, plus the English "a few / a couple of / about /
+  //      around / roughly / some / several" — the last of which closes
+  //      "the office is a few kms down the road", an ENGLISH row that the
+  //      away/from lookahead alone did not cover.
+  //   2. SPANISH "de" AFTER. "kms de …" is a distance phrase in Spanish
+  //      whatever follows it — "de aquí", "de distancia", "de mi casa",
+  //      "del centro". Guarding on the preposition rather than an enumerated
+  //      list of destinations means the next destination nobody thought of is
+  //      covered too, and there is no Spanish sentence where "kms de" reads as
+  //      an English self-harm abbreviation.
+  //   3. ENGLISH direction word AFTER, widened from away/from to include
+  //      down/up/apart.
+  //
+  // Recall is untouched: bare "kms", "gonna kms", "i might kms tonight" and
+  // every "kys" form still alert, in either language, because none of them
+  // carries a quantity frame or a distance preposition.
+  //
+  // KNOWN LIMITS, written down rather than claimed closed — an earlier version
+  // of this comment said the Spanish frames were covered while one of its own
+  // guards was dead code, so the standard here is now "name what still leaks":
+  //   - a Spanish distance frame whose preposition is not "de"/"del" still
+  //     alerts: "queda a kms DESPUÉS de la gasolinera". Guarding on "después"
+  //     would start an enumeration of prepositions, which is the shape that
+  //     failed before; the quantity lookbehind covers the common phrasings.
+  //   - an English distance word outside away/from/down/up/apart does the same
+  //     ("kms east of town").
+  // Both are false POSITIVES on distance talk, never missed disclosures, so
+  // the failure direction is an instructor dismissing an alert.
+  {
+    category: "self_harm",
+    pattern: new RegExp(
+      "(?<!\\d)(?<!\\d\\s)" +
+        // Spanish quantity words, with the "a" OPTIONAL. Requiring it was
+        // wrong in a way only running it shows: "camino unos kms todos los
+        // días", "recorrí varios kms" and "son diez kms" have no "a" at all and
+        // were alerting — with the ENGLISH 988 block, since this entry carries
+        // no lang tag.
+        "(?<!\\b(?:a\\s+)?(?:unos|unas|pocos|pocas|varios|varias|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\\s)" +
+        // English quantity frames, which do require their article.
+        "(?<!\\b(?:a\\s+(?:few|couple\\s+of)|about|around|roughly|some|several)\\s)" +
+        "\\b(?:kms|kys)\\b" +
+        "(?!\\s+(?:away|from|down|up|apart)\\b)" +
+        "(?!\\s+del?(?![\\wáéíóúüñ]))",
+      "i",
+    ),
+  },
+  // "ending things" — the formal pattern only covered "my life" / "it all".
+  // PRECISION EXCEPTION to this module's recall-first policy, written down so
+  // the owner can veto it in review: "end things WITH <someone>" is a breakup,
+  // and relationship talk is precisely what students bring to a coach, so both
+  // 2026-08-21 reviews scored the unguarded form the highest-frequency false
+  // positive in the file. The exemption is only the "with" frame; "thinking
+  // about ending things" and "i want to end things" still alert.
+  { category: "self_harm", pattern: /\bend(?:ing)?\s+things\b(?!\s+with\b)/i },
+  { category: "self_harm", pattern: /\bbetter\s+off\s+if\s+i\s+(wasn'?t|was\s+not|weren'?t)\s+here\b/i },
+  // Method-adjacent disclosure: a stated plan or a past act outranks ideation.
+  // Both are bounded so third-person mentions ("that overdose documentary")
+  // and ordinary adherence ("took my medication this morning") stay silent.
+  { category: "self_harm", pattern: /\b(wanna|gonna|going\s+to|want\s+to|tried\s+to)\s+(od|overdose)\b/i },
+  // "overdose myself" is inherently first-person, so it fires on its own.
+  // "overdose ON <thing>" is not: the object phrase is at least as natural
+  // about someone else, and "my brother overdosed on fentanyl last year" is
+  // grief, not disclosure — yet it alerted, contradicting the comment above.
+  // The frame is an "i", tolerating contractions and a bounded two-word gap
+  // ("i'm overdosing on", "i nearly overdosed on", "i think i overdosed on"),
+  // so a distant "i" elsewhere in the sentence cannot supply it — "my mom
+  // overdosed on pills when i was little" stays silent. The Spanish
+  // "sobredosis" twin below has required a first-person frame all along; this
+  // restores the parity.
+  { category: "self_harm", pattern: /\boverdos(?:e|ed|ing)\s+myself\b/i },
+  // The frame accepts the UNPUNCTUATED contractions too ("im", "ive", "id").
+  // This population writes without apostrophes — the informal-register set
+  // exists because of it — so "im overdosing on these pills right now" was a
+  // miss while "i'm overdosing on these pills" alerted, and a disclosure in
+  // progress is the worst possible place for that gap. Widening the pronoun
+  // costs no precision here: the frame still demands the overdose verb and its
+  // "on" object within two words, so a bare "im" or a stray "id" elsewhere in
+  // a sentence cannot reach it, and the third-person guards below
+  // ("my mom overdosed on pills when i was little") are unaffected because
+  // their "i" sits AFTER the verb.
+  // The bounded two-word gap is what makes this frame first-person, and it was
+  // wide enough to let a third-person SUBJECT stand inside it: "i" + "worried
+  // he" + "overdosed on" matched, so a student expressing concern about
+  // somebody else raised a CRITICAL alert on themselves and named their own
+  // instructors. Measured, not theorised — four such sentences were silent
+  // before the unpunctuated pronouns were added and alerting after, which is
+  // why the earlier claim that widening the pronoun "costs no precision" was
+  // wrong. The gap now refuses third-person pronouns and possessives: this
+  // frame is about the student, so nothing inside it may name anyone else.
+  // "i nearly overdosed on tylenol" and "i think i overdosed on" still match,
+  // because "nearly" and "i" are not on the refusal list.
+  {
+    category: "self_harm",
+    pattern:
+      /\bi(?:'?m|'?ve|'?d)?(?:\s+(?!(?:he|she|they|him|her|his|hers|them|their|theirs|my|your|our|its|someone|somebody|everyone|people|folks)\b)\w+){0,2}\s+overdos(?:e|ed|ing)\s+on\b/i,
+  },
+  // Past act. The verb list is "took|taken|swallowed", not a bare "take":
+  // "ive taken too many pills" and "i swallowed all my medication" are the
+  // same disclosure in the same register as the pinned "i took all my pills"
+  // and were both silent, while a bare present "take" is exactly how adherence
+  // talk reads ("i take all my pills every morning", pinned silent) and must
+  // stay out. The quantity + medication bounds are unchanged, so nothing that
+  // used to alert on the NOUN side stops alerting.
+  // The verb needs a subject that is the STUDENT, and there are exactly two
+  // ways a student writes one: a first-person frame ("i took", "ive taken",
+  // "i have taken"), or no subject at all at the start of a sentence ("took all
+  // my pills last night", "just took all my pills") — the second is a real
+  // message and anchoring only on "i" would lose it.
+  //
+  // The first attempt at this bounded the entry with a lookbehind refusing any
+  // third-person word within two words BEFORE the verb, and that was wrong in a
+  // way only a sweep shows: a third-person word near the verb is not the same
+  // thing as a third-person SUBJECT. "they know i took all my pills", "she said
+  // i took all my pills", "the reason i took all my pills" — eleven such
+  // sentences alerted before that guard and were silent after it, and a
+  // generated sweep of <third-person word> <verb> i took all my pills silenced
+  // 91 of 91. A student naming who knows about their own overdose is exactly
+  // the message this entry exists for.
+  //
+  // The second attempt anchored on the first-person pronoun and refused
+  // third-person words INSIDE the gap that follows it. That recovered the
+  // eleven rows above, and cost a different 880: it accepted a subject only
+  // after ".", "!" or "?", and only across a two-word gap. Both bounds are
+  // wrong about how a frightened student writes. They write one breath and a
+  // comma — "im scared, took all my pills", "i need help - took too many
+  // pills", "help me: took all my pills" — and they write narrative, in the
+  // order it happened — "i came home last night and took all my pills". A
+  // 2,000-row generated sweep put the loss at 880 messages with nothing gained;
+  // 13 of 14 hand-written realistic disclosures went silent. The gate stayed
+  // green throughout because this file had no must-detect row with a
+  // subjectless verb after "," ";" ":" "-" and none with a gap wider than two
+  // words. It does now — every shape below is pinned, so the same narrowing
+  // cannot pass silently again.
+  //
+  // So the sentence boundary accepts any clause separator, and the gaps are
+  // wide enough for narrative. What keeps the third-person rows silent is no
+  // longer gap width, it is WHERE a competing subject can stand: immediately
+  // before the verb. The two lookbehinds refuse a third-person word in either
+  // of those two positions, which is what keeps "i heard she took all my
+  // pills" and "i think my brother swallowed all the pills" silent while the
+  // gap is six words wide. Refusing those words anywhere in the gap instead —
+  // the second attempt's rule — cannot be recovered by any gap width, because
+  // "i locked THE door and took too many pills" and "i sat in THE car and
+  // swallowed all my meds" put a determiner inside a prepositional phrase, not
+  // a subject; both are pinned. The subjectless branch keeps the whole-gap
+  // refusal, where it is correct because nothing legitimate precedes the
+  // subject: "she has taken too many pills", "my brother swallowed all the
+  // pills", "the patient had taken all the medication" and "they swallowed a
+  // bunch of pills" stay silent on it.
+  //
+  // "you" is deliberately absent from the refusal list. Adding it would silence
+  // "i told you i took all my pills" and "i already told you i swallowed all my
+  // meds" — a student disclosing to their coach, in the register they actually
+  // use — and would buy only "you took all the pills" and "i think you took too
+  // many pills", each of which costs one instructor dismissal. Measured, not
+  // assumed, and both disclosure rows are pinned so the trade cannot be made
+  // silently.
+  //
+  // A THIRD BRANCH carries the narrative register past the bounded gap: an "i"
+  // any distance back, provided NO third-person word appears anywhere between
+  // it and the verb. That is the whole-window rule an earlier round used as the
+  // ONLY rule, which was too strict to be the only rule (it silenced "i locked
+  // the door and took too many pills"); as an EXTRA branch it costs nothing,
+  // because the bounded branch above still catches everything it refuses.
+  // Measured before adding: 0 pinned rows lost, 0 must-not-detect rows leaked,
+  // and a 300-row third-person corpus unchanged at 91/300 false positives.
+  // Widening the bounded gap instead was rejected \u2014 6 -> 12 doubles those false
+  // positives to 204/300, and they land on the cohort least able to argue with
+  // a staff alert.
+  //
+  // KNOWN AND ACCEPTED LIMITS, in both directions.
+  //
+  // Missed: GAP-WIDTH TRUNCATION is now this entry's largest silent-loss mode.
+  // A disclosure whose gap exceeds six words AND contains a third-person word
+  // is reached by neither first-person branch. All four of these alerted before
+  // this entry was bounded and are silent now \u2014 recorded rather than claimed
+  // closed, because closing them means widening a bound that costs more than it
+  // buys: "i waited until everyone in the house was finally asleep and took all
+  // my pills" (gap 10, "everyone"), "im scared, last night after everyone went
+  // to bed took all my pills" (subjectless gap 7, "everyone"), "i got back from
+  // the appointment, sat down at the kitchen table and took all my pills" (the
+  // gap crosses a comma and carries "the" twice), and any narrative that puts a
+  // determiner in the two positions before the verb ("all the time" reads as a
+  // subject to the lookbehind).
+  //
+  // Alerted: a proper-name third person ("i think dave took all the pills"),
+  // because no name list can be complete; a COMMON-NOUN third person more than
+  // two positions before the verb ("i saw that my brother had swallowed all the
+  // meds", "i noticed the patient quietly took all the medication") \u2014 the
+  // lookbehind reads two word positions, so a subject pushed further back by an
+  // adverb or an auxiliary is not seen; and a third-person subject in the
+  // clause BEFORE a separator ("she was upset, took all the pills"), because
+  // the subjectless branch by construction only reads the words after the
+  // separator. All recall-first: an instructor dismisses a card, and no
+  // disclosure is lost.
+  {
+    category: "self_harm",
+    pattern:
+      /(?:\bi(?:'?m|'?ve|'?d|'?ll)?(?:\s+(?!(?:he|she|they|him|her|his|hers|them|their|theirs|my|your|our|its|the|someone|somebody|everyone|people|folks)\b)\w+){0,20}\s+|\bi(?:'?m|'?ve|'?d|'?ll)?(?:\s+\w+){0,6}\s+|(?:^|[-\n.!?;:,\u2014]\s*)(?:(?!(?:he|she|they|him|her|his|hers|them|their|theirs|my|your|our|its|the|someone|somebody|everyone|people|folks)\b)\w+\s+){0,4})(?<!\b(?:he|she|they|him|her|his|hers|them|their|theirs|my|your|our|its|the|someone|somebody|everyone|people|folks)\s)(?<!\b(?:he|she|they|him|her|his|hers|them|their|theirs|my|your|our|its|the|someone|somebody|everyone|people|folks)\s\w+\s)(?:took|taken|swallowed)\s+(all|a\s+bunch\s+of|a\s+lot\s+of|too\s+many)\s+(of\s+)?(my\s+|the\s+)?(pills|meds|medication|tylenol|advil)\b/i,
+  },
+  // S1: "od'd" as a completed act. The only od entry required an intent verb
+  // ("gonna od"), so the past tense — the higher-risk disclosure of the two —
+  // was silent. Same first-person frame and same third-person refusal as the
+  // "overdosed on" entry above, so "he od'd on pills" stays silent.
+  {
+    category: "self_harm",
+    pattern:
+      /\bi(?:'?m|'?ve|'?d)?(?:\s+(?!(?:he|she|they|him|her|his|hers|them|their|theirs|my|your|our|its|someone|somebody|everyone|people|folks)\b)\w+){0,2}\s+od(?:'|\u2019)?(?:d|ed)\b/i,
+  },
+  // Same disclosure stated as a PLAN rather than a past act ("i'm going to take
+  // all my pills tonight"). The two entries above between them only covered
+  // intent toward the bare verb ("gonna od") and the completed act ("took all
+  // my pills"), so intent naming the method fell through — while the Spanish
+  // entry below already matched its equivalent. Doubly bounded, same as the
+  // past-act entry: the verb must come from the crisis-intent list (so the bare
+  // present "i take all my pills every morning" and obligation modals like
+  // "i need to take all my meds before bed" stay silent) AND a quantity word
+  // must precede a medication noun (so "i want to take all my certifications"
+  // stays silent). Verb list is deliberately identical to the od/overdose entry.
+  { category: "self_harm", pattern: /\b(wanna|gonna|going\s+to|want\s+to|tried\s+to)\s+take\s+(all|a\s+bunch\s+of|a\s+lot\s+of|too\s+many)\s+(of\s+)?(my\s+|the\s+)?(pills|meds|medication|tylenol|advil)\b/i },
+
+  // --- MEANS FAMILIES (B1): FIREARMS, HANGING, JUMPING. English first; the
+  // Spanish counterparts are in the (es) block below, and the two English
+  // entries that deliberately have NO Spanish twin say so where they stand.
+  //
+  // Why this block exists: every pattern above is about IDEATION or about
+  // pills. `docs/decisions/closed-items.md` records these three families as the largest
+  // remaining coverage gap, and the crisis-en benchmark measured it —
+  // means_firearm 0/16, means_hanging 0/13, means_jumping 0/12, all zero, with
+  // the headline recall held down to 0.794 by them alone. A stated method is
+  // the highest-risk disclosure this detector will ever see, and it was the
+  // one thing it could not see at all.
+  //
+  // Why it is harder than the pills family: pills have one benign sense
+  // (adherence) and a quantity word separates it. These three have MANY, and
+  // they are the ordinary vocabulary of this population and this region —
+  // "shoot me a text", "hang in there", "jump at the chance", plus deer
+  // season, gun safety class, rope courses, and a bridge people cross to get
+  // to class. So each entry below carries its guard, and every guard is proven
+  // to BITE in crisis-detection-means.test.ts: the unguarded shape is written
+  // out there and shown to match the phrase the guard silences. A guard that
+  // could never fire is the "ksy"/"kys" hazard this file already carries a
+  // comment about.
+  //
+  // The general discriminator, family by family, stated once so a future
+  // reader can extend rather than re-derive:
+  //   firearms — a REFLEXIVE object ("myself"), a body part ("to my head"), or
+  //     a firearm reserved FOR THE STUDENT ("is for me", "for when im ready").
+  //     A firearm noun alone is never enough: this is West Virginia.
+  //   hanging  — the reflexive again ("hang myself"), the purpose-built object
+  //     ("noose", "rope around my neck"), or rope acquired FOR ME/FOR IT. Bare
+  //     "hang"/"rope" is idiom or hardware nine times out of ten.
+  //   jumping  — the OBJECT jumped from decides it (bridge/roof/overpass, not
+  //     diving board), or the vehicle stepped in front of, or a first-person
+  //     stance at an edge.
+
+  // Firearms 1/8 — the reflexive. Covers shoot/shooting/shot + myself in every
+  // tense, which is the plainest form of the disclosure.
+  // GUARD: "shooting myself in the foot" is the self-sabotage idiom and is the
+  // single most likely benign use of these exact words in a coaching
+  // conversation ("i keep shooting myself in the foot in interviews"). Only
+  // that object is exempt — "shoot myself in the head" still alerts.
+  { category: "self_harm", pattern: /\b(?:shoot|shoots|shooting|shot)\s+my\s?self\b(?!\s+in\s+the\s+foot\b)/i },
+  // Firearms 2/8 — means named without the verb. No guard: none of "blow my
+  // brains out", "a bullet in my head" or "eat a bullet" has an everyday
+  // sense, and the near-miss idioms ("bullet points", "bite the bullet",
+  // "dodged a bullet") cannot reach these shapes. Pinned silent anyway.
+  { category: "self_harm", pattern: /\b(?:blow(?:ing)?\s+my\s+(?:brains|head)\s+(?:out|off)|(?:put(?:ting)?\s+)?a\s+bullet\s+(?:in|into|through)\s+my\s+(?:head|brain|skull|chest|mouth)|eat(?:ing)?\s+a\s+bullet)\b/i },
+  // Firearms 3/8 — the weapon at a body part.
+  // GUARDS, two, both for idioms that use these exact words about someone
+  // else's coercion or a hypothetical:
+  //   1. "WITH a gun to my head i still couldnt tell you" — the conditional.
+  //   2. a THIRD PARTY holding it: "my boss had a gun to my head about the
+  //      deadline". Written as the file's existing two-position lookbehind
+  //      rather than an enumeration of holders: a third-person word plus a
+  //      holding verb immediately before the article is what makes it somebody
+  //      else's hand. "i put a gun to my head" and "i had the gun in my mouth"
+  //      keep alerting, because "i" is not on the refusal list.
+  // KNOWN LIMIT: a named third party ("dave had a gun to my head") is not
+  // covered, for the same reason the pills entry cannot cover proper names —
+  // no name list is complete. That direction is a false positive, never a
+  // missed disclosure.
+  {
+    category: "self_harm",
+    pattern: new RegExp(
+      "(?<!\\bwith\\s+a\\s+)" +
+        "(?<!\\b(?:he|she|they|his|her|their|my|the)\\s+\\w+\\s+(?:had|has|held|holds|put|puts|pointed|points|kept|keeps)\\s+(?:a|the)\\s+)" +
+        "(?<!\\b(?:he|she|they)\\s+(?:had|has|held|holds|put|puts|pointed|points|kept|keeps)\\s+(?:a|the)\\s+)" +
+        "\\b(?:gun|handgun|pistol|revolver|rifle|shotgun|firearm|glock|barrel)\\s+(?:to|in|into|against|at)\\s+my\\s+(?:head|mouth|temple|chest|chin|throat)\\b",
+      "i",
+    ),
+  },
+  // Firearms 4/8 — a means turned on the student. Deliberately MEANS-AGNOSTIC
+  // ("use it on myself" carries no noun at all), because the sentence that
+  // produced it names the weapon in the clause before: "i have my dads gun and
+  // im going to use it on myself".
+  { category: "self_harm", pattern: /\b(?:use|using|used|turn(?:ing|ed)?|point(?:ing|ed)?)\s+(?:it|that|this|them|the\s+\w+|my\s+\w+|his\s+\w+|her\s+\w+)\s+on\s+my\s?self\b/i },
+  // Firearms 5/8 — finishing it WITH a named means. The "ending things" entry
+  // above covers the bare phrase; this covers the instrument, and it covers
+  // rope and belt too so the hanging family inherits it.
+  { category: "self_harm", pattern: /\b(?:end|ending|finish|finishing)\s+(?:it|this|things)\s+with\s+(?:my|the|a|his|her)\s+(?:gun|handgun|pistol|revolver|rifle|shotgun|firearm|glock|rope|belt|noose)\b/i },
+  // Firearms 6/8 — a firearm or ammunition reserved FOR THE STUDENT. This is
+  // the disclosure with no verb in it at all ("the gun in the closet is for
+  // me", "i bought bullets for myself"), and the beneficiary is the whole
+  // signal: the corpus's benign rows are full of firearms bought, cleaned,
+  // sold, stored and taught, and every one of them is for somebody or
+  // something else ("for him", "for his birthday", "to pay the car note").
+  // The four-word gap is what lets a location clause sit between the noun and
+  // the beneficiary ("gun IN THE CLOSET IS for me").
+  // KNOWN LIMIT, recall-first and recorded: an innocent transfer phrased the
+  // same way still alerts — "my uncle is holding the shotgun for me while i
+  // move". That costs an instructor one dismissal.
+  { category: "self_harm", pattern: /\b(?:gun|guns|handgun|pistol|revolver|rifle|shotgun|firearm|glock|bullet|bullets|shells|rounds|ammo|ammunition)\b(?:\s+\w+){0,4}\s+(?:is\s+|are\s+)?for\s+(?:me|my\s?self)\b/i },
+  // Firearms 7/8 — possession at a time of intent. "load the gun tonight",
+  // "i been holding the gun tonight". The time word is what separates it from
+  // ordinary ownership talk; "we keep the shotgun locked in the safe" carries
+  // neither the verb nor the marker and is pinned silent.
+  { category: "self_harm", pattern: /\b(?:hold(?:ing)?|sit(?:ting)?\s+(?:here\s+)?with|sleep(?:ing)?\s+with|load(?:ing|ed)?)\s+(?:the|my|a)\s+(?:gun|handgun|pistol|revolver|rifle|shotgun|firearm|glock)\b(?:\s+\w+){0,3}\s+(?:tonight|right\s+now|all\s+night|in\s+the\s+morning)\b/i },
+  // Firearms 8/8 — a firearm with a readiness or finishing tail, and the
+  // "sitting with" stance that needs no tail. "i keep the pistol loaded FOR
+  // WHEN IM READY", "i bought a gun SO I CAN FINISH IT", "i been SITTING WITH
+  // THE RIFLE thinking about it". The tails are the intent; the stance one is
+  // separate because a person sitting alone with their gun has already said
+  // enough.
+  { category: "self_harm", pattern: /\b(?:gun|handgun|pistol|revolver|rifle|shotgun|firearm|glock)\b(?:\s+\w+){0,3}\s+(?:for\s+when\s+i(?:'?m|m)?\s+ready|when\s+i(?:'?m|m)\s+ready|so\s+i\s+can\s+(?:finish|end|do)\s+(?:it|this)|to\s+(?:finish|end)\s+(?:it|this))\b/i },
+  { category: "self_harm", pattern: /\b(?:sit(?:ting)?|sat|lay(?:ing)?|laid|stand(?:ing)?|stood)\s+(?:here\s+|there\s+|out\s+)?with\s+(?:the|my)\s+(?:gun|handgun|pistol|revolver|rifle|shotgun|firearm|glock)\b/i },
+
+  // Hanging 1/5 — the reflexive, every tense including the archaic "hanged".
+  // GUARD: "hung myself out to dry" is the idiom, and it is the only benign
+  // reading of "hung myself" a coach will meet. "gonna hang out then probably
+  // hang myself" still alerts — the guard is on the object, not the sentence.
+  { category: "self_harm", pattern: /\b(?:hang|hangs|hanging|hung|hanged)\s+my\s?self\b(?!\s+out\s+to\s+dry\b)/i },
+  // Hanging 2/5 — the image rather than the act: "i keep picturing myself
+  // hanging from the rafters". The preposition carries it — "hanging OVER my
+  // head" (the deadline) and "hanging IN the door" (keys) are pinned silent,
+  // and the second branch names the fixtures a person hangs FROM so a bare
+  // "hanging from" cannot fire on laundry.
+  { category: "self_harm", pattern: /\b(?:my\s?self|me)\s+hanging\s+(?:from|by)\b|\bi(?:'?ll|'?m)?\s+(?:be|been)\s+hanging\s+from\s+(?:the|a|that)\s+(?:rafters?|beam|joist|ceiling|pipe|tree)\b/i },
+  // Hanging 3/5 — the purpose-built object. A noose has no everyday sense, so
+  // the bound here is only that somebody made, got or hung one, which keeps
+  // documentary and history talk ("they showed a noose in the exhibit") out.
+  { category: "self_harm", pattern: /\b(?:made|make|making|tied|tie|tying|got|bought|hung|hang|hanging|have|had)\s+(?:a|the|my|another)\s+noose\b|\bnoose\s+(?:for\s+(?:me|my\s?self|it|this)|is\s+ready)\b/i },
+  // Hanging 4/5 — the object at the neck. "neck pain", "a crick in my neck"
+  // and "a necklace" cannot reach it because the ligature noun is required.
+  { category: "self_harm", pattern: /\b(?:rope|cord|belt|cable|wire|chain)\s+a?round\s+my\s+neck\b/i },
+  // Hanging 5/5 — rope acquired or rigged FOR THE STUDENT, the exact shape of
+  // Firearms 6 and for the same reason: this population buys rope constantly
+  // and every benign row says what for. "i bought rope AT THE HARDWARE STORE
+  // FOR THE TRAILER" is pinned silent and "i bought rope FOR IT" alerts, which
+  // is the whole distinction. "i need rope to tie down the mattress" is silent
+  // on the verb instead — needing is not acquiring.
+  { category: "self_harm", pattern: /\b(?:bought|got|tied|tie|tying|hung|made|making|kept|keeping|found|hid|hiding|stashed)\s+(?:a\s+|the\s+|some\s+|my\s+|another\s+)?(?:rope|cord|noose|belt|cable|extension\s+cord|chain)\b(?:\s+\w+){0,4}\s+for\s+(?:me|my\s?self|it|this)\b/i },
+  // Hanging, the ambiguous one, kept on purpose: "i been looking at the beam
+  // in the basement" is a real corpus row and it is a disclosure in a house
+  // where somebody has already decided. It is ALSO home repair. Recall-first
+  // resolves it toward alerting, and the guard narrows it as far as it can go
+  // without losing the disclosure: only LOOKING or STARING at a beam fires, so
+  // "we are replacing the beam in the basement" stays silent (pinned, with its
+  // bite proof). KNOWN LIMIT: a student who says "i keep looking at that beam,
+  // it's sagging" gets an alert. That is the trade, written down.
+  { category: "self_harm", pattern: /\b(?:looking|look|staring|stare|stared|looked)\s+at\s+(?:the|that|them)\s+(?:beam|beams|rafter|rafters|joist|joists)\b/i },
+
+  // Jumping 1/6 — the object jumped from is the discriminator, not the verb.
+  // "he jumped off the diving board at the pool" and "we did a bungee jump"
+  // are pinned silent because a diving board and a bungee tower are not on the
+  // list; bridges, roofs, overpasses and parking garages are.
+  { category: "self_harm", pattern: /\b(?:jump|jumps|jumping|jumped|leap|leaping|leapt)\s+(?:off|from|out\s+of)\s+(?:the\s+|a\s+|that\s+|my\s+|this\s+)?(?:bridge|overpass|roof|rooftop|building|parking\s+garage|garage|balcony|ledge|tower|cliff|window|dam|silo|something\s+high|somewhere\s+high)\b/i },
+  // Jumping 2/6 — into traffic. The vehicle list is what keeps "she jumped in
+  // and helped me finish" and "lets jump on a call" away from it.
+  { category: "self_harm", pattern: /\b(?:jump(?:ing|ed|s)?|step(?:ping|ped|s)?|walk(?:ing|ed|s)?|lay|laid)\s+(?:out\s+)?in\s+front\s+of\s+(?:a|the|that)\s+(?:train|bus|truck|car|semi|subway|traffic)\b/i },
+  // Jumping 3/6 — "throw myself off/under". The preposition list is closed on
+  // purpose: "throw myself INTO the job search" is ordinary and must not fire.
+  { category: "self_harm", pattern: /\b(?:throw(?:ing|s)?|threw)\s+my\s?self\s+(?:off|under|in\s+front\s+of|down)\b/i },
+  // Jumping 4/6 — the vehicle used as the means. "on purpose" is REQUIRED
+  // within a short window, because "i drove into a wall" without it is an
+  // accident report and a student telling their coach about a wreck must not
+  // raise a critical alert. KNOWN LIMIT: a deliberate crash described without
+  // those two words ("i aimed at the guardrail") is missed.
+  { category: "self_harm", pattern: /\b(?:driv(?:e|ing)|drove|crash(?:ing|ed)?|steer(?:ing)?)\s+(?:my\s+\w+\s+|the\s+\w+\s+)?(?:off\s+the\s+road|into\s+(?:a|the)\s+(?:wall|tree|pole|guardrail|barrier|bridge|abutment|semi|truck))\b(?:\s+\w+){0,3}\s+on\s+purpose\b/i },
+  // Jumping 5/6 — the intent tail with no object at all: "im going to jump and
+  // end it".
+  { category: "self_harm", pattern: /\bjump(?:ing)?\s+and\s+(?:end|finish)\s+(?:it|this|it\s+all)\b/i },
+  // Jumping 6/6 — the stance. "i stood at the edge and almost jumped", "i been
+  // standing on the bridge for an hour": no verb of self-harm anywhere, and
+  // both are disclosures.
+  // GUARD: "on the edge OF MY SEAT" is the idiom this shape walks straight
+  // into, so that object is exempt (pinned, with its bite proof).
+  // KNOWN LIMIT, recall-first: "i been sitting on the bridge waiting for my
+  // ride" alerts. An instructor dismisses it.
+  { category: "self_harm", pattern: /\b(?:stood|standing|stand|sat|sitting)\s+(?:there\s+|out\s+|up\s+)?(?:at|on|by)\s+(?:the|that)\s+(?:edge|ledge|railing|rail|bridge|overpass|rooftop|guardrail)\b(?!\s+of\s+my\s+seat\b)/i },
+
+  // The residual families (B1b) follow, in order, from crisis-patterns-residual.ts.
+  ...RESIDUAL_CRISIS_PATTERNS,
+];
+
+export interface CrisisDetection {
+  matched: boolean;
+  category: CrisisCategory | null;
+  /** Language of the matched pattern family; null when nothing matched. */
+  lang: CrisisLang | null;
+}
+
+/**
+ * Deterministic scan of a single message for self-harm, harm-to-others, or
+ * abuse signals. Pure + synchronous + no AI — safe to call on every turn.
+ * The first matching pattern wins; English families are scanned first, so a
+ * mixed-language message that trips an English phrase reports lang "en".
+ */
+export function detectCrisisSignal(text: string): CrisisDetection {
+  if (!text || typeof text !== "string") return { matched: false, category: null, lang: null };
+  for (const { category, pattern, lang } of CRISIS_PATTERNS) {
+    if (pattern.test(text)) return { matched: true, category, lang: lang ?? "en" };
+  }
+  return { matched: false, category: null, lang: null };
+}

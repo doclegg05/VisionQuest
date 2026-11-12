@@ -188,13 +188,14 @@ describe("renderRecentActivity", () => {
 describe("recent-activity wiring (send route)", () => {
   // Code that exists but is never called counts as not done. These assertions
   // red-baseline against the pre-change route: it fetched recentEvents and
-  // alerts in the bundle, then discarded them.
-  const routeSource = readFileSync("src/app/api/chat/send/route.ts", "utf8");
+  // alerts in the bundle, then discarded them. Since E7 the send route's
+  // context assembly lives in src/lib/chat/turn-context.ts.
+  const routeSource = readFileSync("src/lib/chat/turn-context.ts", "utf8");
 
   it("the send route builds the section from the bundle it already fetched", () => {
     assert.ok(
       routeSource.includes("renderRecentActivity("),
-      "src/app/api/chat/send/route.ts never calls renderRecentActivity — the bundle's recentEvents/alerts are still fetched and discarded",
+      "the send route's context assembly never calls renderRecentActivity — the bundle's recentEvents/alerts are still fetched and discarded",
     );
     assert.ok(
       routeSource.includes("bundle.recentEvents"),
@@ -204,7 +205,7 @@ describe("recent-activity wiring (send route)", () => {
 
   it("the section is measured in the sage.prompt.size sections map", () => {
     assert.ok(
-      routeSource.includes("sectionSizes.recentActivity"),
+      routeSource.includes('appendBlock(build, "recentActivity"'),
       "sectionSizes has no recentActivity entry — the new section would be invisible in prompt-size logs",
     );
   });

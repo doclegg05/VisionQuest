@@ -366,13 +366,33 @@ export function isRetryable(error: unknown): boolean {
   );
 }
 
+/** Fixed identifiers only: upstream messages and remedy hints may contain secrets. */
+function budgetDiagnostic(status: number, bodyText: string): string {
+  if (status !== 402 && status !== 403) return "";
+  try {
+    const metadata = JSON.parse(bodyText)?.error?.metadata;
+    const sources = ["openrouter_credits", "openrouter_key_limit", "openrouter_in_flight_budget"];
+    const reasons = ["weight_exceeds_budget", "in_flight_budget_exhausted"];
+    const details: string[] = [];
+    if (sources.includes(metadata?.limit_source)) details.push(`limit_source=${metadata.limit_source}`);
+    if (reasons.includes(metadata?.reason)) details.push(`reason=${metadata.reason}`);
+    return details.length ? ` [${details.join(", ")}]` : "";
+  } catch {
+    return "";
+  }
+}
+
 export async function failureFromResponse(response: Response): Promise<OpenRouterError> {
-  // The body only refines 403 into credits vs refused and 400 into an unknown
-  // model vs a bad request. If it cannot be read, the status alone still
-  // classifies the failure.
+  // The body refines 403/400 classifications and supplies allowlisted budget
+  // identifiers. Neither upstream messages nor remedy hints are logged. An
+  // unreadable body still leaves the status-based classification intact.
   const bodyText = await response.text().catch(() => "");
   const kind = classifyOpenRouterFailure(response.status, bodyText);
-  return new OpenRouterError(`OpenRouter request failed (${response.status}, ${kind})`, kind, response.status);
+  return new OpenRouterError(
+    `OpenRouter request failed (${response.status}, ${kind})${budgetDiagnostic(response.status, bodyText)}`,
+    kind,
+    response.status,
+  );
 }
 
 /** Boundary parse of a non-streaming reply. */

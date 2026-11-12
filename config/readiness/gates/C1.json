@@ -5,6 +5,13 @@
   "title": "Verify buttons report failure",
   "doneWhen": "Component tests show a visible error for a mocked 500 on each action.",
   "check": {
-    "type": "pending"
+    "type": "test",
+    "files": [
+      "src/lib/teacher/student-action.test.ts",
+      "src/components/teacher/StudentDetail.action-errors.test.tsx",
+      "src/components/teacher/student-detail/ActionNotice.test.tsx",
+      "src/components/teacher/student-detail/GoalsPlanTab.goal-actions.test.tsx",
+      "src/components/teacher/student-detail/ProgressTab.application-verify.test.tsx"
+    ]
   }
 }

@@ -8,6 +8,7 @@ import { MoodSparkline } from "@/components/progression/MoodSparkline";
 import { WellbeingCrisisCard } from "@/components/teacher/WellbeingCrisisCard";
 import { WorkAvailabilityPanel } from "./WorkAvailabilityPanel";
 import { WELLBEING_ALERT_TYPE } from "@/lib/sage/wellbeing-card";
+import { MIN_PASSWORD_LENGTH, PASSWORD_LENGTH_HINT, generatePassword } from "@/lib/password-policy";
 import {
   DiscoveryClusterPicker,
   needsPathwayCluster,
@@ -28,7 +29,8 @@ interface OverviewTabProps {
   onToggleResetPw: () => void;
   newPassword: string;
   onNewPasswordChange: (value: string) => void;
-  resetStatus: "idle" | "saving" | "done" | "error";
+  /** On "done", `newPassword` holds the password just set, shown until the instructor presses Close. */
+  resetStatus: "idle" | "saving" | "done";
   onResetPassword: () => void;
   /** Deactivation */
   confirmDeactivate: boolean;
@@ -39,7 +41,6 @@ interface OverviewTabProps {
   archiving: boolean;
   onArchive: () => void;
   archiveResult: { storageKey: string; fileCount: number } | null;
-  archiveError: string | null;
   /**
    * Phase 6 tab reorg: the Coach tab composes OverviewTab and hides the
    * admin controls (password reset, deactivate, archive). Those move to
@@ -47,6 +48,106 @@ interface OverviewTabProps {
    * as before.
    */
   hideAdminControls?: boolean;
+}
+
+/** Plain text, not masked: the instructor reads it to the student. */
+function PasswordField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  return (
+    <input
+      id="reset-password-input"
+      type="text"
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      aria-describedby="reset-password-hint"
+      autoComplete="off"
+      autoCapitalize="none"
+      autoCorrect="off"
+      spellCheck={false}
+      data-1p-ignore
+      data-lpignore="true"
+      className="font-mono text-sm theme-input rounded-lg px-3 py-1.5 w-48 pointer-coarse:min-h-11 focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
+    />
+  );
+}
+
+interface ResetControlsProps {
+  newPassword: string;
+  onNewPasswordChange: (value: string) => void;
+  saving: boolean;
+  onResetPassword: () => void;
+}
+
+/** The field, the password maker and the Reset password button. */
+function ResetControls({ newPassword, onNewPasswordChange, saving, onResetPassword }: ResetControlsProps) {
+  // Set by the password maker, so a screen reader hears that the box was filled.
+  const [madePassword, setMadePassword] = useState(false);
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      <label htmlFor="reset-password-input" className="text-xs text-[var(--ink-muted)]">
+        New password:
+      </label>
+      <PasswordField
+        value={newPassword}
+        onChange={(value) => {
+          setMadePassword(false);
+          onNewPasswordChange(value);
+        }}
+      />
+      <button
+        type="button"
+        onClick={() => {
+          onNewPasswordChange(generatePassword());
+          setMadePassword(true);
+        }}
+        className="inline-flex items-center justify-center rounded-lg border border-[var(--badge-info-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--badge-info-text)] transition-colors hover:bg-[var(--badge-info-bg)] pointer-coarse:min-h-11"
+      >
+        Make a password for me
+      </button>
+      <p aria-live="polite" className="sr-only">
+        {madePassword ? "A new password is in the box." : ""}
+      </p>
+      <p id="reset-password-hint" className="basis-full text-xs text-[var(--ink-muted)]">
+        {PASSWORD_LENGTH_HINT}. Small letters and numbers only. Press Reset password, then give the student the new password. They type the dashes too.
+      </p>
+      <button
+        type="button"
+        onClick={onResetPassword}
+        disabled={saving || newPassword.length < MIN_PASSWORD_LENGTH}
+        className="primary-button text-xs px-3 py-1.5 rounded-lg pointer-coarse:min-h-11 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {saving ? "Saving..." : "Reset password"}
+      </button>
+    </div>
+  );
+}
+
+interface ResetDonePanelProps {
+  password: string;
+  onClose: () => void;
+}
+
+/**
+ * Shown after a reset worked. The password stays until Close, which clears it
+ * from the page, and is large enough for a student across a desk to read.
+ * Keyboard focus moves to Close when the panel appears: the Reset password
+ * button that had it is gone.
+ */
+function ResetDonePanel({ password, onClose }: ResetDonePanelProps) {
+  return (
+    <div role="status" className="rounded-xl border-2 border-success bg-success-soft p-3 text-sm text-[var(--ink-strong)]">
+      <p className="font-semibold">Password changed. Give the student this password:</p>
+      <p className="mt-1 font-mono text-xl tracking-wide">{password}</p>
+      <p className="mt-1">They are now signed out on every other device. When they sign in with this password, VisionQuest asks them to choose their own. Stay with them for that step. Tell them to type it exactly as shown, with the dashes. All letters are small.</p>
+      <button
+        type="button"
+        autoFocus
+        className="primary-button mt-2 inline-flex min-h-11 items-center rounded-lg px-4 text-sm"
+        onClick={onClose}
+      >
+        Close
+      </button>
+    </div>
+  );
 }
 
 export default function OverviewTab({
@@ -66,7 +167,6 @@ export default function OverviewTab({
   archiving,
   onArchive,
   archiveResult,
-  archiveError,
   hideAdminControls = false,
 }: OverviewTabProps) {
   const {
@@ -183,7 +283,10 @@ export default function OverviewTab({
               </Link>
               {!hideAdminControls && (
                 <button
+                  type="button"
                   onClick={onToggleResetPw}
+                  aria-expanded={showResetPw}
+                  aria-controls="reset-password-panel"
                   className="inline-flex items-center text-xs text-[var(--badge-info-text)] hover:text-[var(--ink-strong)] pointer-coarse:min-h-11"
                 >
                   Reset Password
@@ -191,29 +294,17 @@ export default function OverviewTab({
               )}
             </div>
             {!hideAdminControls && showResetPw && (
-              <div className="flex items-center gap-2 mt-2 flex-wrap">
-                <label htmlFor="reset-password-input" className="text-xs text-[var(--ink-muted)]">
-                  New password:
-                </label>
-                <input
-                  id="reset-password-input"
-                  type="password"
-                  value={newPassword}
-                  onChange={(event) => onNewPasswordChange(event.target.value)}
-                  placeholder="New password (6+ chars)"
-                  className="text-sm theme-input rounded-lg px-3 py-1.5 w-48 focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
-                />
-                <button
-                  onClick={onResetPassword}
-                  disabled={resetStatus === "saving" || newPassword.length < 6}
-                  className="primary-button text-xs px-3 py-1.5 rounded-lg pointer-coarse:min-h-11 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {resetStatus === "saving" ? "..." : resetStatus === "done" ? "Done!" : "Reset"}
-                </button>
-                <span role="alert" aria-live="polite" className="text-xs">
-                  {resetStatus === "done" && <span className="text-[var(--badge-success-text)]">Done!</span>}
-                  {resetStatus === "error" && <span className="text-[var(--badge-error-text)]">Failed</span>}
-                </span>
+              <div id="reset-password-panel" className="mt-2">
+                {resetStatus === "done" ? (
+                  <ResetDonePanel password={newPassword} onClose={onToggleResetPw} />
+                ) : (
+                  <ResetControls
+                    newPassword={newPassword}
+                    onNewPasswordChange={onNewPasswordChange}
+                    saving={resetStatus === "saving"}
+                    onResetPassword={onResetPassword}
+                  />
+                )}
               </div>
             )}
 
@@ -299,9 +390,6 @@ export default function OverviewTab({
                   Download ZIP archive
                 </a>
               </div>
-            )}
-            {archiveError && (
-              <p className="mt-2 text-xs text-[var(--badge-error-text)]">{archiveError}</p>
             )}
             </>
             )}

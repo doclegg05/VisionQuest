@@ -1,0 +1,10 @@
+{
+  "id": "H12",
+  "kind": "task",
+  "set": "pilot",
+  "title": "Error reporting stays small in the browser",
+  "doneWhen": "A real build shows the Sentry chunk under 100 KB gzipped, and M4 does not rise.",
+  "check": {
+    "type": "pending"
+  }
+}

@@ -12,6 +12,7 @@ import { logAuditEvent } from "@/lib/audit";
 import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { studentLogKey } from "@/lib/log-keys";
+import { passwordChangeRequired } from "@/lib/password-change-gate";
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
@@ -154,7 +155,7 @@ async function refuseAccountMismatch(req: NextRequest, student: GoogleAccount) {
     action: "auth.google_login_refused_account_mismatch",
     targetType: "student",
     targetId: student.id,
-    summary: `Google sign-in refused for ${student.studentId}: the email is bound to a different Google account.`,
+    summary: `Google sign-in refused: the email is bound to a different Google account.`,
   });
   return NextResponse.redirect(new URL("/?error=oauth_account_mismatch", req.url));
 }
@@ -286,7 +287,7 @@ export async function GET(req: NextRequest) {
         action: "auth.google_login_mfa_required",
         targetType: "student",
         targetId: student.id,
-        summary: `Google sign-in verified for ${student.studentId} — MFA challenge required.`,
+        summary: `Google sign-in verified; MFA challenge required.`,
       });
       return redirectTo("/?mfa=1");
     }
@@ -306,12 +307,15 @@ export async function GET(req: NextRequest) {
         action: "auth.google_link",
         targetType: "student",
         targetId: student.id,
-        summary: `Google account linked to ${student.studentId} by verified email.`,
+        summary: `Google account linked by verified email.`,
       });
     }
 
-    // Set session cookie
-    await setSessionCookie(student.id, student.role, student.sessionVersion);
+    // Set session cookie. A student whose password staff set is held to the
+    // change-password screen however they signed in (src/proxy.ts).
+    await setSessionCookie(student.id, student.role, student.sessionVersion, {
+      mustChangePassword: passwordChangeRequired(student),
+    });
 
     await logAuditEvent({
       actorId: student.id,
@@ -319,7 +323,7 @@ export async function GET(req: NextRequest) {
       action: "auth.google_login",
       targetType: "student",
       targetId: student.id,
-      summary: `Google OAuth login for ${student.studentId}.`,
+      summary: `Google OAuth login.`,
     });
 
     return redirectTo("/chat");

@@ -75,7 +75,7 @@ export const POST = withAuth(async (session: Session, req: Request) => {
       actorId: session.id,
       targetType: "StudentHiddenJob",
       targetId: hiddenJob.id,
-      summary: `${session.displayName} hid job "${listing.title}"`,
+      summary: `Student hid job "${listing.title}"`,
     });
     return NextResponse.json({ hiddenJob });
   }
@@ -89,7 +89,7 @@ export const POST = withAuth(async (session: Session, req: Request) => {
     actorId: session.id,
     targetType: "StudentHiddenJob",
     targetId: hiddenJob.id,
-    summary: `${session.displayName} restored a hidden job`,
+    summary: `Student restored a hidden job`,
   });
   return NextResponse.json({ hiddenJob });
 });

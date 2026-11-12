@@ -2,10 +2,10 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { syncStudentAlerts } from "@/lib/advising";
-import { afterWrite } from "@/lib/after-write";
-import { deferAfterResponse } from "@/lib/after-response";
+import { deferPerStudent } from "@/lib/after-response";
 import { withAuth, badRequest, forbidden, isStaffRole, type Session } from "@/lib/api-error";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
+import { recordStudentView } from "@/lib/audit";
 import { applyStudentOrientationCompletion } from "@/lib/orientation-completion";
 import { isVerificationRequiredItem } from "@/lib/orientation-step-resources";
 import { parseBody } from "@/lib/schemas";
@@ -31,22 +31,28 @@ const orientationToggleSchema = z.object({
 
 async function resolveTargetStudentId(session: Session, requestedStudentId?: string | null) {
   const targetStudentId = requestedStudentId?.trim() || session.id;
-
-  if (targetStudentId !== session.id) {
-    if (!isStaffRole(session.role)) {
-      throw forbidden();
-    }
-
-    await assertStaffCanManageStudent(session, targetStudentId);
-  }
-
-  return targetStudentId;
+  if (targetStudentId === session.id) return session.id;
+  if (!isStaffRole(session.role)) throw forbidden();
+  // The guard also accepts a login username. Use the database id it returns
+  // for the view row and the data read, never the raw requested value.
+  const student = await assertStaffCanManageStudent(session, targetStudentId);
+  return student.id;
 }
 
 // GET — list orientation items with student's progress
 export const GET = withAuth(async (session, req: Request) => {
   const { searchParams } = new URL(req.url);
   const targetStudentId = await resolveTargetStudentId(session, searchParams.get("studentId"));
+
+  if (targetStudentId !== session.id) {
+    // A staff read of another student's orientation: write the view row.
+    await recordStudentView({
+      actorId: session.id,
+      actorRole: session.role,
+      targetStudentId,
+      surface: "orientation",
+    });
+  }
 
   const items = await prisma.orientationItem.findMany({
     orderBy: { sortOrder: "asc" },
@@ -170,12 +176,8 @@ export const POST = withAuth(async (session, req: Request) => {
     // for tens of seconds in prod (2026-09-07, src/lib/after-response.ts).
     // Staff paths below still await it: the instructor's queue refreshes
     // right after and should not show a stale alert.
-    deferAfterResponse(() =>
-      afterWrite(() => syncStudentAlerts(targetStudentId), {
-        surface: "orientation",
-        effect: "syncStudentAlerts",
-        studentId: targetStudentId,
-      }),
+    deferPerStudent(targetStudentId, { surface: "orientation", effect: "syncStudentAlerts" }, () =>
+      syncStudentAlerts(targetStudentId),
     );
     if (result.outcome === "pending_verification") {
       return NextResponse.json({ success: true, data: { pendingVerification: true } });
@@ -185,12 +187,14 @@ export const POST = withAuth(async (session, req: Request) => {
 
   if (staff && verify === "decline") {
     await declineVerification(session, targetStudentId, itemId);
+    // eslint-disable-next-line no-restricted-syntax -- staff path awaits the sync on purpose
     await syncStudentAlerts(targetStudentId);
     return NextResponse.json({ success: true, data: { verificationStatus: "declined" } });
   }
 
   if (staff && (completed || verify === "confirm")) {
     const verified = await completeAsStaff(session, targetStudentId, itemId, verify);
+    // eslint-disable-next-line no-restricted-syntax -- staff path awaits the sync on purpose
     await syncStudentAlerts(targetStudentId);
     if (verified) {
       return NextResponse.json({ success: true, data: { verificationStatus: "verified" } });
@@ -199,6 +203,14 @@ export const POST = withAuth(async (session, req: Request) => {
   }
 
   await resetProgress(targetStudentId, itemId);
-  await syncStudentAlerts(targetStudentId);
+  if (staff) {
+    // eslint-disable-next-line no-restricted-syntax -- staff path awaits the sync on purpose
+    await syncStudentAlerts(targetStudentId);
+  } else {
+    // A student un-checking a step: the answer does not wait on the queue.
+    deferPerStudent(targetStudentId, { surface: "orientation", effect: "syncStudentAlerts" }, () =>
+      syncStudentAlerts(targetStudentId),
+    );
+  }
   return NextResponse.json({ ok: true });
 });

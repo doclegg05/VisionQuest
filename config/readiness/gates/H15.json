@@ -1,0 +1,25 @@
+{
+  "id": "H15",
+  "kind": "task",
+  "set": "launch",
+  "title": "Every staff read of one student's record is written down",
+  "doneWhen": "The route walk passes with an empty exemption list or a reason beside each entry. A test for each route finds its view row.",
+  "check": {
+    "type": "test",
+    "files": [
+      "src/lib/audit.staff-reads.test.ts",
+      "src/app/api/teacher/staff-read-views.test.ts",
+      "src/lib/audit.test.ts",
+      "src/app/api/teacher/failed-extractions/route.test.ts",
+      "src/components/teacher/FailedExtractionDetails.test.tsx",
+      "src/lib/staff-read-walk.test.ts",
+      "src/app/api/staff-read-views.shared-routes.test.ts",
+      "src/lib/sage/staff-student-context.test.ts",
+      "src/lib/student-archive.storage-key.test.ts",
+      "src/app/api/teacher/students/[id]/archive/route.test.ts",
+      "src/app/api/audit-summary-names.test.ts",
+      "src/app/api/orientation/route.test.ts",
+      "src/lib/sage/agent/executor-security.test.ts"
+    ]
+  }
+}

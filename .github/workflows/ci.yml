@@ -217,6 +217,43 @@ jobs:
           DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
           JOB_LISTING_UNIQUE_TEST_ENABLED: "true"
 
+      - name: Run job reaper integration test
+        # H5: the reaper that takes back jobs a restart left in "processing"
+        # is one UPDATE with FOR UPDATE SKIP LOCKED. Only a real database can
+        # show that two passes at once reclaim a row once, so it runs here
+        # against the same hermetic Postgres as the two steps above.
+        run: npm run test:jobreaper
+        env:
+          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
+          DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
+          JOB_REAPER_DB_TEST_ENABLED: "true"
+
+      - name: Run demo closeout integration test
+        # H10: the closeout deletes the marked demo accounts and everything
+        # attached to them in one transaction. Only a real database can show
+        # that every explicit delete runs in an order the foreign keys accept,
+        # that no cascade takes a row the plan did not list, and that a refusal
+        # or failure after deletes have run rolls them back. Same hermetic
+        # Postgres as the steps above. The test refuses to run unless the host
+        # is this machine and the database holds no demo account before it
+        # seeds its own.
+        run: npm run test:democloseout
+        env:
+          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
+          DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
+          DEMO_CLOSEOUT_DB_TEST_ENABLED: "true"
+
+      - name: Run alert actions integration test
+        # C11: the queue's Undo sends back the timestamp a Resolve or Dismiss
+        # answered with, and reopens only an alert that still holds it. Only a
+        # real database can show that the stamp survives the column's precision
+        # and still matches. Same hermetic Postgres as the steps above.
+        run: npm run test:alertactions
+        env:
+          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
+          DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
+          ALERT_ACTIONS_DB_TEST_ENABLED: "true"
+
       # --- Gate-tier benchmarks ------------------------------------------
       # Numbers, not pass/fail: each suite writes reports/benchmarks/latest/
       # <suite>.json and --compare exits 1 when a gate- or nightly-tier metric
@@ -288,6 +325,10 @@ jobs:
         run: npm run test:smoke
         env:
           SMOKE_SERVER_SCRIPT: start
+          # The boot probes also refuse a production-mode boot that does not
+          # say whether cloud AI is blocked or allowed (readiness H4). Blocked
+          # is production's answer, and no smoke test calls a model.
+          AI_LOCAL_ONLY: "true"
           # Boot probes (src/lib/boot-probes.ts) stop a production-mode boot
           # when ADMIN_DATABASE_URL is unset, and `start` is production mode.
           # Presence is all the config probe checks (the privilege probe is
@@ -344,6 +385,12 @@ jobs:
       # is production parity (the verify job already runs the RLS suite with it).
       RLS_CONTEXT_INJECTION: "true"
       ADMIN_DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_e2e"
+      # The boot probes also refuse a production-mode boot that does not say
+      # whether cloud AI is blocked or allowed (readiness H4). Blocked is
+      # production's answer; the e2e specs stub chat and call no model. Never
+      # set AI_CLOUD_INFERENCE here: the cohort demo step below turns
+      # COHORT_DEMO_MODE on, and the two together refuse the boot.
+      AI_LOCAL_ONLY: "true"
       # playwright.config.ts webServer honors this: boot the built standalone
       # server (scripts/start-production.mjs), matching the smoke-test boot
       # path, instead of `next dev`.
@@ -426,8 +473,10 @@ jobs:
           e2e/student-journey.spec.ts
           e2e/jobs-journey.spec.ts
           e2e/teacher-loop.spec.ts
+          e2e/regions-admin.spec.ts
           e2e/theme-variant.spec.ts
           e2e/cohort-demo-off.spec.ts
+          e2e/first-day-journey.spec.ts
           --reporter=line --timeout=120000
 
       # Cohort demo mode, switch ON. COHORT_DEMO_MODE is set on this step and
@@ -513,16 +562,21 @@ jobs:
         # actually broke. When a watch-tier suite here is promoted to gate (see
         # docs/runbooks/benchmarks.md), drop continue-on-error here entirely.
         #
-        # --workers=1: the login limiter counts every attempt, and parallel
-        # specs sharing one IP and one fixture account exhaust it (10 per IP
-        # and 5 per USER per 15 minutes — see the re-seed step above for which
-        # one actually binds). playwright.config.ts already sets it under CI;
-        # named here because these specs would be the first to notice.
+        # --workers=1: written when the login limiter counted every attempt
+        # (10 per IP and 5 per USER per 15 minutes), so parallel specs sharing
+        # one IP and one fixture account exhausted it. Since readiness task A1
+        # it counts failed attempts only (30 per address, 5 per account) and a
+        # correct sign-in gives both units back. playwright.config.ts already
+        # sets it under CI; kept because these specs would be the first to
+        # notice a limiter that stopped refunding.
         continue-on-error: true
         # ONE COLLECTOR PER INVOCATION, login rate limits cleared between.
         #
-        # THE PROBLEM. `/api/auth/login` applies two limiters: `login:<ip>` at
-        # 10 attempts per 15 minutes, and `login:user:<studentId>` at **5**.
+        # THE PROBLEM, as it stood before readiness task A1 (failed attempts
+        # only are counted now: 30 per address and 5 per account, and a correct
+        # sign-in gives both units back). `/api/auth/login` applied two
+        # limiters: `login:<ip>` at 10 attempts per 15 minutes, and
+        # `login:user:<studentId>` at **5**.
         # Their buckets are `RateLimitEntry` ROWS, so they outlive the webServer
         # that each `playwright test` invocation boots and are shared by every
         # step running against this job's one database. Every spec here signs in
@@ -576,6 +630,11 @@ jobs:
             echo "::group::collect $spec"
             npx tsx scripts/seed-e2e-users.ts >/dev/null
             npx playwright test "$spec" --workers=1 --reporter=line --timeout=180000 || true
+            # Each invocation empties test-results/, so keep this collector's
+            # failure screenshots and traces before the next one runs.
+            if [ -d test-results ] && [ -n "$(ls -A test-results)" ]; then
+              mkdir -p bench-failures && cp -R test-results "bench-failures/$(basename "$spec" .spec.ts)"
+            fi
             echo "::endgroup::"
           done
         env:
@@ -593,6 +652,14 @@ jobs:
           # job's hermetic Postgres is and no real deployment is. See
           # src/lib/email.ts.
           EMAIL_SINK_ALLOW_HERMETIC: "1"
+
+      - name: Upload browser benchmark failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-collector-failures
+          path: bench-failures/
+          if-no-files-found: ignore
 
       - name: Score browser benchmarks
         env:
@@ -617,3 +684,14 @@ jobs:
           name: benchmark-results-e2e
           path: reports/benchmarks/latest/
           if-no-files-found: ignore
+
+      - name: Prove the first-day test detects each missing gate
+        run: node scripts/readiness/first-day-gate-proof.mjs
+
+      - name: Upload first-day gate proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: first-day-gate-proof
+          path: reports/first-day-gate-proof/
+          if-no-files-found: warn

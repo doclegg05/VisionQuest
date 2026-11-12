@@ -24,6 +24,7 @@ import { fleschKincaidGrade, PLAIN_LANGUAGE_IDEAL_GRADE } from "@/lib/sage/reada
 
 type CookieRecord = { studentId: string; role: string; sessionVersion: number };
 const cookieSets: CookieRecord[] = [];
+const cookieOptions: unknown[] = [];
 
 /** Order of the DB update and the session-cache invalidation on the promotion path. */
 const callOrder: string[] = [];
@@ -46,7 +47,8 @@ mock.module("@/lib/auth", {
     normalizeStudentId: (raw: string) =>
       raw.toLowerCase().replace(/\s+/g, "").replace(/[^a-z0-9@._-]/g, ""),
     normalizeEmail: (raw: string) => raw.trim().toLowerCase(),
-    setSessionCookie: async (studentId: string, role: string, sessionVersion: number) => {
+    setSessionCookie: async (studentId: string, role: string, sessionVersion: number, options: unknown) => {
+      cookieOptions.push(options);
       cookieSets.push({ studentId, role, sessionVersion });
       return "fake-jwt-token";
     },
@@ -164,6 +166,7 @@ after(() => {
 describe("POST /api/auth/register-teacher (staff registration)", () => {
   beforeEach(() => {
     cookieSets.length = 0;
+    cookieOptions.length = 0;
     callOrder.length = 0;
     mockFindFirst.mock.resetCalls();
     mockCreate.mock.resetCalls();
@@ -409,6 +412,7 @@ describe("POST /api/auth/register-teacher (staff registration)", () => {
       assert.equal(mockCreate.mock.calls[0].arguments[0].data.passwordHash, "scrypt$salt$hashed-fresh-password-123");
       assert.equal(cookieSets.length, 1, "expected session cookie to be set");
       assert.deepEqual(cookieSets[0], { studentId: "tch-1", role: "teacher", sessionVersion: 1 });
+      assert.deepEqual(cookieOptions, [{ mustChangePassword: false }], "a password the new staff member typed");
       assert.equal(mockLogAuditEvent.mock.callCount(), 1);
       const creationEvent = mockLogAuditEvent.mock.calls[0].arguments[0];
       assert.equal(creationEvent.action, "auth.register_teacher");
@@ -549,7 +553,7 @@ describe("POST /api/auth/register-teacher (staff registration)", () => {
     function attemptFrom(ip: string, registrationKey: string) {
       return mockRequest("/api/auth/register-teacher", {
         method: "POST",
-        headers: { "x-forwarded-for": ip },
+        headers: { "x-forwarded-for": `${ip}, 172.70.1.9` },
         body: {
           registrationKey,
           role: "teacher",
@@ -651,7 +655,7 @@ describe("POST /api/auth/register-teacher (staff registration)", () => {
     function distinctGuess(index: number) {
       return mockRequest("/api/auth/register-teacher", {
         method: "POST",
-        headers: { "x-forwarded-for": `198.51.100.${index}` },
+        headers: { "x-forwarded-for": `198.51.100.${index}, 172.70.1.9` },
         body: {
           registrationKey: `wrong-key-guess-${index}`,
           role: "admin",
@@ -721,7 +725,7 @@ describe("POST /api/auth/register-teacher (staff registration)", () => {
       const res = await registerRoute.POST(
         mockRequest("/api/auth/register-teacher", {
           method: "POST",
-          headers: { "x-forwarded-for": "198.51.100.200" },
+          headers: { "x-forwarded-for": `198.51.100.200, 172.70.1.9` },
           body: {
             registrationKey: TEACHER_KEY,
             role: "teacher",

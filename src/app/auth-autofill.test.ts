@@ -16,10 +16,15 @@ import { join } from "node:path";
  * emailed-reset login field is hidden until its tab is chosen.
  */
 
+/**
+ * The field with this id: a plain `<input>`, or the shared
+ * `<StudentPasswordField>`, which hands `autoComplete` to its own input
+ * (src/components/settings/StudentPasswordField.test.tsx holds it to that).
+ */
 function inputTag(file: string, id: string): string {
   const source = readFileSync(join(process.cwd(), file), "utf8");
-  const match = source.match(new RegExp(`<input\\b[^>]*?\\bid="${id}"[\\s\\S]*?/>`));
-  assert.ok(match, `${file}: no <input id="${id}">`);
+  const match = source.match(new RegExp(`<(?:input|StudentPasswordField)\\b[^>]*?\\bid="${id}"[\\s\\S]*?/>`));
+  assert.ok(match, `${file}: no field with id="${id}"`);
   return match[0];
 }
 
@@ -41,6 +46,10 @@ describe("forgot-password autofill", () => {
   for (const id of ["new-password", "confirm-password"]) {
     it(`#${id} is a new password`, () => assertAttr(file, id, 'autoComplete="new-password"'));
   }
+
+  it("#new-password is the shared student field: the rule, a count and a Show button", () => {
+    assert.match(inputTag(file, "new-password"), /^<StudentPasswordField\b/);
+  });
 });
 
 describe("reset-password autofill", () => {
@@ -49,6 +58,10 @@ describe("reset-password autofill", () => {
   for (const id of ["password", "confirm-password"]) {
     it(`#${id} is a new password`, () => assertAttr(file, id, 'autoComplete="new-password"'));
   }
+
+  it("#password is the shared student field: the rule, a count and a Show button", () => {
+    assert.match(inputTag(file, "password"), /^<StudentPasswordField\b/);
+  });
 });
 
 describe("teacher-register autofill", () => {

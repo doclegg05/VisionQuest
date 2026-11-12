@@ -7,11 +7,12 @@ import { coordinatorHasRegion } from "@/lib/region";
 /**
  * Who has not been placed in the organization tree yet.
  *
- * An instructor is unplaced when they have no region and no class. An
+ * The setup gate applies to an instructor with no region and no class;
+ * the placement list also includes instructors who already have a class. An
  * applicant is waiting when their account has no enrollment that is not
  * archived. Both lists are for admins and program coordinators.
  *
- * These reads use `prismaAdmin` on purpose. An unplaced instructor has no class,
+ * These reads use `prismaAdmin` on purpose. An unplaced instructor may have no class,
  * and a waiting applicant has no enrollment, so under RLS no one in the tree
  * can see either row. Every function checks the caller's role first, in the
  * same function, and every query has an explicit filter and a field list.
@@ -58,7 +59,9 @@ function assertWholeState(actor: Session): void {
 export async function listUnplacedStaff(actor: Session): Promise<UnplacedStaffRow[]> {
   assertWholeState(actor);
   return prismaAdmin.student.findMany({
-    where: { ...UNPLACED_WHERE },
+    // Having a class does not place its instructor in a region. Such an
+    // instructor still needs this control before they can create a class.
+    where: { role: "teacher", instructorRegions: { none: {} } },
     select: { id: true, displayName: true, role: true, createdAt: true },
     orderBy: { createdAt: "asc" },
   });

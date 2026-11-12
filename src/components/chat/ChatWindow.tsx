@@ -1,60 +1,40 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ArrowSquareOut, CheckCircle, Clock, List, WarningCircle, Wrench } from "@phosphor-icons/react";
 import { apiFetch } from "@/lib/api";
-import ChatInput from "./ChatInput";
+import ChatInput, { type MessageBoxHandle } from "./ChatInput";
 import { ActionCard } from "./ActionCard";
-import { ChatErrorBanner } from "./ChatErrorBanner";
 import { ConfirmToolCard } from "./ConfirmToolCard";
 import ConversationList from "./ConversationList";
 import MessageBubble from "./MessageBubble";
-import { RetryResponseButton } from "./RetryResponseButton";
 import TypingIndicator from "./TypingIndicator";
 import BrandLockup from "@/components/ui/BrandLockup";
 import { StarterChips } from "./StarterChips";
 import type { ChatRole } from "@/lib/chat/commands";
-import { getRoleSettingsPath } from "@/lib/role-home";
-import { parseChatSseChunk, type ChatSseEvent } from "@/lib/chat/sse";
-import { resolveSendError, resolveStreamOutcome } from "@/lib/chat/send-outcome";
+import { prepareRetry } from "@/lib/chat/send-outcome";
+import { readChatStream, formatToolName, type AgentEventItem } from "./chat-stream";
+import { FailedReplyActions, PROGRAM_SETUP_HREF } from "./FailedReplyActions";
 import { useProgression } from "@/components/progression/ProgressionProvider";
 import { STAGE_OPENERS } from "@/lib/chat/stage-openers";
 import { determineStage } from "@/lib/sage/stage";
 import { startGoalPolling } from "./goal-polling";
+import { runExclusive, shouldFocusRetry, type ChatMessage, type FailedTurn } from "./failed-turn";
+import { useSendAbort } from "./send-abort";
+import { fetchGoalCount, postChatMessage, startOptimisticGreeting } from "./send-request";
+import { messagesAfterSendError, turnResultMessages } from "./send-turn";
+import { createTurnRecorder, type SentSoFar } from "./turn-recorder";
+import { logBusy, showsCannedOpener, startSlowReplyTimer, startStalledReplyTimer } from "./wait-and-stop";
 
-interface Message {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  events?: AgentEventItem[];
-}
-
-interface AgentEventItem {
-  id: string;
-  kind: "tool" | "action";
-  callId?: string;
-  tool?: string;
-  status?: "pending" | "success" | "error";
-  summary: string;
-  action?: ChatSseEvent["action"];
-  target?: string;
-  label?: string;
-  meta?: Record<string, unknown>;
-}
-
-async function getErrorMessage(res: Response) {
-  try {
-    const data = await res.json();
-    return data.error || "Failed to send message.";
-  } catch {
-    return "Failed to send message.";
-  }
-}
+type Message = ChatMessage;
 
 interface ChatWindowInnerProps {
   role: ChatRole;
   defaultStage?: string;
+  /** Sage runs on the local model: no canned opener (wait-and-stop.ts). */
+  localProvider: boolean;
 }
 
 const REQUESTED_STAGE_OPENERS = {
@@ -84,25 +64,6 @@ function buildDeepLinkPrefill(searchParams: Pick<URLSearchParams, "get">): strin
   }
   if (name) return `I have a question about ${name}.`;
   return "";
-}
-
-function formatToolName(tool: string | undefined): string {
-  if (!tool) return "Sage tool";
-  return tool
-    .replace(/^sage\./, "")
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (char) => char.toUpperCase());
-}
-
-function upsertAgentEvent(events: AgentEventItem[], next: AgentEventItem) {
-  const existingIndex = next.callId
-    ? events.findIndex((event) => event.callId === next.callId && event.kind === next.kind)
-    : -1;
-  if (existingIndex >= 0) {
-    events[existingIndex] = { ...events[existingIndex], ...next };
-  } else {
-    events.push(next);
-  }
 }
 
 function metaString(meta: Record<string, unknown> | undefined, key: string): string | undefined {
@@ -214,7 +175,7 @@ function AgentEventList({ events }: { events: AgentEventItem[] }) {
   );
 }
 
-function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
+function ChatWindowInner({ role, defaultStage, localProvider }: ChatWindowInnerProps) {
   const searchParams = useSearchParams();
   const requestedStage = searchParams.get("stage");
   const requestedStageOpener =
@@ -231,8 +192,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [showSidebar, setShowSidebar] = useState(false);
   const [goalToast, setGoalToast] = useState<string | null>(null);
-  const [incompleteMessageId, setIncompleteMessageId] = useState<string | null>(null);
-  const [chatError, setChatError] = useState<string | null>(null);
+  const [failedTurn, setFailedTurn] = useState<FailedTurn | null>(null);
   const [conversationRefreshKey, setConversationRefreshKey] = useState(0);
   /**
    * Optimistic greeting shown immediately on a new conversation before SSE
@@ -247,9 +207,24 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
   const sidebarRef = useRef<HTMLDivElement>(null);
   /** Tracks whether the warmup fetch has fired this session. */
   const warmupFiredRef = useRef(false);
+  const retryButtonRef = useRef<HTMLButtonElement>(null);
+  /** Set while a Try again is running, so a second tap before re-render does nothing. */
+  const retryInFlightRef = useRef(false);
+  const messageBoxRef = useRef<MessageBoxHandle>(null);
+  /** The answer in flight, so Stop can end it once armed; and whether Stop did. */
+  const { gate: sendAbort, isArmed: stopIsArmed } = useSendAbort();
+  /** Counts sends, so the wait words belong to one send and reset on the next. */
+  const [sendCount, setSendCount] = useState(0);
+  const [slowForSend, setSlowForSend] = useState<number | null>(null);
+  const waitingForWord = isLoading && !streamingContent;
+  const slowReply = waitingForWord && slowForSend === sendCount;
+  const [stalledForSend, setStalledForSend] = useState<number | null>(null);
+  const stalledReply = waitingForWord && stalledForSend === sendCount;
 
   useEffect(() => {
     mountedRef.current = true;
+    // Unmount deliberately does not abort the reply in flight: the server then
+    // finishes it and saves the full reply, which shows when the student is back.
     return () => {
       mountedRef.current = false;
       cancelGoalPollRef.current?.();
@@ -261,6 +236,18 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
     const timer = setTimeout(() => setGoalToast(null), 4000);
     return () => clearTimeout(timer);
   }, [goalToast]);
+
+  // The wait words at five seconds, then at two minutes that Stop works (E7); per send.
+  useEffect(() => {
+    if (!waitingForWord) return;
+    const send = sendCount;
+    const cancelSlow = startSlowReplyTimer(() => setSlowForSend(send));
+    const cancelStalled = startStalledReplyTimer(() => setStalledForSend(send));
+    return () => {
+      cancelSlow();
+      cancelStalled();
+    };
+  }, [waitingForWord, sendCount]);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -283,7 +270,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
             content: m.content,
           }))
         );
-        setChatError(null);
+        setFailedTurn(null);
       }
     } catch (err) {
       console.error("Failed to load conversation:", err instanceof Error ? err.message : "Unknown error");
@@ -360,8 +347,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
     setMessages([]);
     setStreamingContent("");
     setStreamingEvents([]);
-    setIncompleteMessageId(null);
-    setChatError(null);
+    setFailedTurn(null);
     setOptimisticGreeting(null);
     setShowSidebar(false);
   };
@@ -382,218 +368,151 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
     });
   }, []);
 
+  /** The screen at the start of a send: the student's bubble, the dots, and the opener. */
+  const beginTurnDisplay = useCallback((text: string, isRetry: boolean) => {
+    // A Try again from an earlier turn never stays on screen past a new send.
+    setFailedTurn(null);
+    // B2: loading shows at once, before any network call. A Try again
+    // answers the message already on screen, so it adds no new bubble.
+    if (!isRetry) setMessages((prev) => [...prev, { id: `temp-${Date.now()}`, role: "user", content: text }]);
+    setIsLoading(true);
+    setSendCount((count) => count + 1);
+    setStreamingContent("");
+    setStreamingEvents([]);
+    const greetingGeneration = ++greetingGenerationRef.current;
+    const isFirstMessage = !conversationId && messages.length === 0;
+    if (showsCannedOpener({ role, isFirstMessage, localProvider })) {
+      const isCurrent = () => greetingGenerationRef.current === greetingGeneration;
+      startOptimisticGreeting({ opener: requestedStageOpener, deriveStage: deriveStageFromGoals, isCurrent, show: setOptimisticGreeting });
+    }
+  }, [conversationId, messages.length, role, localProvider, requestedStageOpener, deriveStageFromGoals]);
+
+  /**
+   * Sets the conversation a send's events name, and refreshes the list once
+   * when a new chat gets its id. One noter per send.
+   */
+  const makeConversationNoter = useCallback(() => {
+    let refreshedList = false;
+    return (nextId: string | undefined) => {
+      setConversationId(nextId ?? conversationId);
+      if (refreshedList || !nextId || nextId === conversationId) return;
+      refreshConversationList();
+      refreshedList = true;
+    };
+  }, [conversationId, refreshConversationList]);
+
+  /** B4: hides the canned opener, and stops a pending one from appearing. */
+  const clearOptimisticGreeting = useCallback(() => {
+    greetingGenerationRef.current++;
+    setOptimisticGreeting(null);
+  }, []);
+
+  /** The screen once a send is over, whatever happened. */
+  const endTurnDisplay = useCallback(() => {
+    setIsLoading(false);
+    // A failure mid-reply moved the partial text into `messages`, so nothing
+    // may stay drawn as still streaming below it.
+    setStreamingContent("");
+    setStreamingEvents([]);
+    // B4: the optimistic greeting never outlives the send, error paths included.
+    clearOptimisticGreeting();
+  }, [clearOptimisticGreeting]);
+
+  /** A finished turn's bubbles, and its Try again when the reply came back empty or cut off. */
+  const showTurnResult = useCallback((shown: { messages: ChatMessage[]; failedTurn: FailedTurn | null }) => {
+    setMessages((prev) => [...prev, ...shown.messages]);
+    if (shown.failedTurn) setFailedTurn(shown.failedTurn);
+  }, []);
+
+  /**
+   * What a Stop or a failure leaves on screen: the partial, the 988 help when
+   * the first event flagged it, and Try again when it applies.
+   */
+  const showSendFailure = useCallback(
+    (err: unknown, sent: SentSoFar, text: string, noteConversation: (nextId: string | undefined) => void) => {
+      const stopped = sendAbort.wasStopped();
+      if (!stopped) console.error("Send error:", err instanceof Error ? err.name : "Unknown error");
+      const after = messagesAfterSendError({
+        err, stopped, timedOut: sendAbort.timedOut(), text, role,
+        ...sent,
+        id: `${stopped ? "stop" : "err"}-${Date.now()}`,
+      });
+      // A new chat's first message may be saved before the failure: keep its conversation for Try again.
+      if (after.conversationId) noteConversation(after.conversationId);
+      showTurnResult(after);
+    },
+    [role, sendAbort, showTurnResult]
+  );
+
   const handleSend = useCallback(
-    async (text: string, attachmentIds?: string[]) => {
-      setChatError(null);
-
-      // B2: Hoist the loading state so the TypingIndicator renders immediately
-      // on send, before the goals pre-fetch or any network call.
-      const userMsg: Message = {
-        id: `temp-${Date.now()}`,
-        role: "user",
-        content: text,
-      };
-      setMessages((prev) => [...prev, userMsg]);
-      setIsLoading(true);
-      setStreamingContent("");
-      setStreamingEvents([]);
-      const greetingGeneration = ++greetingGenerationRef.current;
-
-      // B4: If this is the first message of a new conversation (no conversationId
-      // and no prior messages), show an optimistic greeting immediately while SSE
-      // is in flight. Discard it if the user sends a second message before SSE
-      // arrives (handled by checking messages.length in the SSE reader below).
-      const isFirstMessage = !conversationId && messages.length === 0;
-      if (isFirstMessage && role === "student") {
-        if (requestedStageOpener) {
-          setOptimisticGreeting(requestedStageOpener);
-        } else {
-          // Derive stage asynchronously — don't await here so rendering isn't blocked.
-          // The greeting will appear as soon as the stage resolves (typically <200ms).
-          void deriveStageFromGoals().then((stage) => {
-            if (greetingGenerationRef.current === greetingGeneration) {
-              setOptimisticGreeting(STAGE_OPENERS[stage]);
-            }
-          });
-        }
-      }
-
-      const prevGoalCountPromise = apiFetch("/api/goals")
-        .then(async (goalsRes) => {
-          if (!goalsRes.ok) return 0;
-          const goalsData = await goalsRes.json();
-          return Array.isArray(goalsData.goals) ? goalsData.goals.length : 0;
-        })
-        .catch(() => 0);
-
-      // Hoisted above the try block (not `let` inside it) so the catch
-      // block below can see how much text, if any, streamed in before the
-      // failure — that's what decides whether a retry control is offered
-      // on a zero-content error (see resolveSendError in send-outcome.ts).
-      let fullContent = "";
-
+    async (text: string, attachmentIds?: string[], retry?: { retryOf: string | null }) => {
+      beginTurnDisplay(text, Boolean(retry));
+      const prevGoalCountPromise = fetchGoalCount();
+      const noteConversation = makeConversationNoter();
+      // Outside the try, so the catch knows what streamed in before a Stop or failure.
+      const turn = createTurnRecorder({
+        noteIds: sendAbort.noteIds,
+        noteConversation,
+        onFirstText: clearOptimisticGreeting,
+        showText: setStreamingContent,
+        showEvents: setStreamingEvents,
+      });
+      const controller = sendAbort.begin();
       try {
-        const stageParam = searchParams.get("stage") ?? defaultStage;
-        const res = await apiFetch("/api/chat/send", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            message: text,
-            conversationId,
-            // Only send on the first message of a new conversation
-            requestedStage: conversationId ? undefined : stageParam,
-            attachmentIds: attachmentIds && attachmentIds.length > 0 ? attachmentIds : undefined,
-          }),
+        const res = await postChatMessage({
+          text,
+          conversationId,
+          stage: searchParams.get("stage") ?? defaultStage,
+          attachmentIds,
+          retryOf: retry?.retryOf,
+          signal: controller.signal,
         });
-
-        if (!res.ok) {
-          throw new Error(await getErrorMessage(res));
-        }
-
-        const reader = res.body?.getReader();
-        const decoder = new TextDecoder();
-        let streamCompleted = false;
-        let refreshedConversationList = false;
-        let sseBuffer = "";
-        const agentEvents: AgentEventItem[] = [];
-
-        const maybeRefreshConversations = (nextId?: string) => {
-          if (!refreshedConversationList && nextId && nextId !== conversationId) {
-            refreshConversationList();
-            refreshedConversationList = true;
-          }
-        };
-
-        const applyStreamEvent = (data: ChatSseEvent) => {
-          if (data.error) throw new Error(data.error);
-          if (data.conversationId && !data.done) {
-            setConversationId(data.conversationId);
-            maybeRefreshConversations(data.conversationId);
-          }
-          if (data.text) {
-            // B4: First real token clears the optimistic greeting.
-            if (!fullContent) {
-              greetingGenerationRef.current++;
-              setOptimisticGreeting(null);
-            }
-            fullContent += data.text;
-            setStreamingContent(fullContent);
-          }
-          if (data.type === "tool_call") {
-            upsertAgentEvent(agentEvents, {
-              id: data.callId ?? `tool-${agentEvents.length}`,
-              kind: "tool",
-              callId: data.callId,
-              tool: data.tool,
-              status: "pending",
-              summary: `Checking ${formatToolName(data.tool).toLowerCase()}...`,
-            });
-            setStreamingEvents([...agentEvents]);
-          }
-          if (data.type === "tool_result") {
-            upsertAgentEvent(agentEvents, {
-              id: data.callId ?? `tool-${agentEvents.length}`,
-              kind: "tool",
-              callId: data.callId,
-              tool: agentEvents.find((event) => event.callId === data.callId)?.tool,
-              status: data.status,
-              summary: data.summary || "Sage finished checking this.",
-            });
-            setStreamingEvents([...agentEvents]);
-          }
-          if (data.type === "action") {
-            agentEvents.push({
-              id: `action-${data.callId ?? agentEvents.length}-${data.target ?? data.label ?? "open"}`,
-              kind: "action",
-              action: data.action,
-              target: data.target,
-              label: data.label,
-              meta: data.meta,
-              summary: data.label || "Open",
-            });
-            setStreamingEvents([...agentEvents]);
-          }
-          if (data.done) {
-            setConversationId(data.conversationId ?? conversationId);
-            maybeRefreshConversations(data.conversationId);
-            streamCompleted = true;
-          }
-        };
-
-        if (!reader) {
-          throw new Error("Sage returned no response stream. Please try again.");
-        }
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          const chunk = decoder.decode(value, { stream: true });
-          const parsed = parseChatSseChunk(chunk, sseBuffer);
-          sseBuffer = parsed.buffer;
-          for (const data of parsed.events) {
-            applyStreamEvent(data);
-          }
-        }
-
-        const finalChunk = decoder.decode();
-        if (finalChunk || sseBuffer.trim()) {
-          const parsed = parseChatSseChunk(`${finalChunk}\n\n`, sseBuffer);
-          sseBuffer = parsed.buffer;
-          for (const data of parsed.events) {
-            applyStreamEvent(data);
-          }
-        }
-
-        const msgId = `msg-${Date.now()}`;
-        const streamOutcome = resolveStreamOutcome(streamCompleted, fullContent);
-        const assistantMsg: Message = {
-          id: msgId,
-          role: "assistant",
-          content: streamOutcome.content,
-          events: agentEvents.length > 0 ? [...agentEvents] : undefined,
-        };
-
-        if (streamOutcome.offerRetry) {
-          setIncompleteMessageId(msgId);
-        }
-
-        setMessages((prev) => [...prev, assistantMsg]);
-        setStreamingContent("");
-        setStreamingEvents([]);
-        const prevGoalCount = await prevGoalCountPromise;
-        pollForGoals(prevGoalCount);
-        // Check for XP/achievement/level changes
-        setTimeout(() => checkProgression(), 2000);
+        const result = await readChatStream(res, turn.handlers);
+        const { savedUserMessageId, crisisBlock } = turn.sent();
+        showTurnResult(turnResultMessages({ result, id: `msg-${Date.now()}`, savedUserMessageId, crisisBlock }));
+        pollForGoals(await prevGoalCountPromise);
+        setTimeout(() => checkProgression(), 2000); // XP, achievement and level changes
       } catch (err) {
-        console.error("Send error:", err instanceof Error ? err.message : "Unknown error");
-        const errorOutcome = resolveSendError(err, fullContent);
-        setChatError(errorOutcome.bannerMessage);
-        const errMsgId = `err-${Date.now()}`;
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: errMsgId,
-            role: "assistant",
-            content: errorOutcome.displayContent,
-          },
-        ]);
-        // A send error with no prior content is the same dead end as a
-        // zero-content stream completion — offer the same retry control.
-        if (errorOutcome.offerRetry) {
-          setIncompleteMessageId(errMsgId);
-        }
+        showSendFailure(err, turn.sent(), text, noteConversation);
       } finally {
-        greetingGenerationRef.current++;
-        setIsLoading(false);
-        setStreamingEvents([]);
-        // B4: Ensure optimistic greeting is always cleared when streaming ends,
-        // including on error paths.
-        setOptimisticGreeting(null);
+        sendAbort.end(controller);
+        endTurnDisplay();
       }
     },
-    [conversationId, messages.length, deriveStageFromGoals, pollForGoals, refreshConversationList, checkProgression, searchParams, defaultStage, requestedStageOpener]
+    [
+      conversationId,
+      pollForGoals,
+      checkProgression,
+      searchParams,
+      defaultStage,
+      sendAbort,
+      beginTurnDisplay,
+      endTurnDisplay,
+      clearOptimisticGreeting,
+      makeConversationNoter,
+      showTurnResult,
+      showSendFailure,
+    ]
   );
+
+  // After a failed turn, focus goes to its Try again once loading has ended,
+  // after ChatInput's own effect focuses the message box (rule in failed-turn.ts).
+  useEffect(() => {
+    if (shouldFocusRetry(failedTurn, isLoading)) retryButtonRef.current?.focus();
+  }, [failedTurn, isLoading]);
+
+  /** Ends Sage's answer once armed; handleSend's catch shows what a Stop leaves. */
+  const stopReply = sendAbort.stop;
+
+  const retryFailedTurn = (failedId: string) =>
+    runExclusive(retryInFlightRef, async () => {
+      const retry = prepareRetry(messages, failedId);
+      if (!retry) return;
+      // Before the button goes away, so focus never falls to the page.
+      messageBoxRef.current?.focus();
+      setMessages(retry.messages);
+      await handleSend(retry.text, undefined, { retryOf: retry.retryOf });
+    });
 
   useEffect(() => {
     if (!showSidebar) return;
@@ -655,9 +574,15 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
             <p className="text-sm font-semibold text-[var(--ink-strong)]">Sage</p>
             <p className="text-xs text-[var(--ink-muted)]">Your SPOKES coach</p>
           </div>
+          <Link
+            href="/about-sage"
+            className="ml-auto inline-flex min-h-11 items-center px-2 text-sm font-semibold text-[var(--ink-muted)] underline hover:text-[var(--ink-strong)]"
+          >
+            About Sage
+          </Link>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 py-5" role="log" aria-label="Conversation with Sage" aria-live="polite">
+        <div className="flex-1 overflow-y-auto px-4 py-5" role="log" aria-label="Conversation with Sage" aria-live="polite" aria-busy={logBusy(isLoading, streamingContent)}>
           <div className="mx-auto max-w-3xl space-y-5">
             {messages.length === 0 && !isLoading && (
               <div className="mt-16 text-center text-[var(--ink-muted)]">
@@ -681,18 +606,20 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
 
             {messages.map((msg) => (
               <div key={msg.id}>
-                <MessageBubble role={msg.role} content={msg.content} />
+                <MessageBubble
+                  role={msg.role}
+                  content={msg.content}
+                  failed={msg.failure?.alert}
+                  textId={failedTurn?.messageId === msg.id ? `failed-text-${msg.id}` : undefined}
+                />
                 {msg.events?.length ? <AgentEventList events={msg.events} /> : null}
-                {msg.id === incompleteMessageId && (
-                  <RetryResponseButton
-                    onRetry={() => {
-                      const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
-                      if (lastUserMsg) {
-                        setMessages((prev) => prev.filter((m) => m.id !== incompleteMessageId));
-                        setIncompleteMessageId(null);
-                        void handleSend(lastUserMsg.content);
-                      }
-                    }}
+                {failedTurn?.messageId === msg.id && (
+                  <FailedReplyActions
+                    retryRef={retryButtonRef}
+                    offerRetry={failedTurn.offerRetry}
+                    setupHref={failedTurn.setupLink ? PROGRAM_SETUP_HREF : null}
+                    describedById={`failed-text-${msg.id}`}
+                    onRetry={() => void retryFailedTurn(msg.id)}
                   />
                 )}
               </div>
@@ -717,7 +644,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
               <AgentEventList events={streamingEvents} />
             )}
 
-            {isLoading && !streamingContent && !optimisticGreeting && <TypingIndicator />}
+            {isLoading && !streamingContent && !optimisticGreeting && <TypingIndicator slow={slowReply} stalled={stalledReply} />}
 
             <div ref={messagesEndRef} />
           </div>
@@ -732,11 +659,15 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
           </div>
         )}
 
-        {chatError && (
-          <ChatErrorBanner message={chatError} settingsHref={getRoleSettingsPath(role)} />
-        )}
-
-        <ChatInput onSend={handleSend} disabled={isLoading} role={role} initialMessage={deepLinkPrefill} />
+        <ChatInput
+          onSend={handleSend}
+          onStop={stopReply}
+          stopArmed={stopIsArmed}
+          disabled={isLoading}
+          role={role}
+          initialMessage={deepLinkPrefill}
+          messageBoxRef={messageBoxRef}
+        />
       </div>
 
       {showSidebar && (
@@ -752,12 +683,14 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
 interface ChatWindowProps {
   role?: ChatRole;
   defaultStage?: string;
+  /** From the server: Sage runs on the local model. Default false keeps today's opener. */
+  localProvider?: boolean;
 }
 
-export default function ChatWindow({ role = "student", defaultStage }: ChatWindowProps = {}) {
+export default function ChatWindow({ role = "student", defaultStage, localProvider = false }: ChatWindowProps = {}) {
   return (
     <Suspense>
-      <ChatWindowInner role={role} defaultStage={defaultStage} />
+      <ChatWindowInner role={role} defaultStage={defaultStage} localProvider={localProvider} />
     </Suspense>
   );
 }

@@ -5,6 +5,10 @@
   "title": "Incident basics page at `docs/runbooks/incident-basics.md`",
   "doneWhen": "Britt's approval is recorded.",
   "check": {
-    "type": "pending"
+    "type": "owner",
+    "doc": "docs/audits/2026-11-09-ops-evidence-checklist.md",
+    "rows": [
+      "H8: Incident basics runbook approved"
+    ]
   }
 }

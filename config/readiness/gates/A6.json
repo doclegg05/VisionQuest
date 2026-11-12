@@ -1,0 +1,20 @@
+{
+  "id": "A6",
+  "kind": "task",
+  "set": "launch",
+  "title": "The sign-in limits count the real client address",
+  "doneWhen": "A test sends a forged first hop and the limiter still counts one address. A test covers a request with no proxy header. Tests cover the deferred lockout write and the hashed login.",
+  "check": {
+    "type": "test",
+    "files": [
+      "src/lib/client-ip.test.ts",
+      "src/lib/client-ip.docs.test.ts",
+      "src/lib/env.client-ip.test.ts",
+      "src/app/api/auth/login/__tests__/route.client-address.test.ts",
+      "src/app/api/auth/reset-password/questions/__tests__/route.test.ts",
+      "src/app/api/csp-report/route.test.ts",
+      "src/app/api/intake/submit/route.test.ts",
+      "src/lib/connect/employer-request.test.ts"
+    ]
+  }
+}

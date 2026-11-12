@@ -312,5 +312,23 @@ describe("POST /api/applications", () => {
       assert.equal(mockLogAuditEvent.mock.callCount(), 0);
       assert.equal(mockSyncStudentAlerts.mock.callCount(), 0);
     });
+
+    it("answers without waiting for the alert sync, and still starts it for the student", async () => {
+      let release: () => void = () => undefined;
+      mockSyncStudentAlerts.mock.mockImplementation(() => new Promise<void>((resolve) => {
+        release = resolve;
+      }));
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const timeout = new Promise<"timed out">((resolve) => {
+        timer = setTimeout(() => resolve("timed out"), 2000);
+      });
+      const outcome = await Promise.race([route.POST(applyRequest() as never), timeout]);
+      clearTimeout(timer);
+      release();
+      await new Promise((resolve) => setImmediate(resolve));
+      if (outcome === "timed out") assert.fail("the response waited on the alert sync");
+      assert.equal(outcome.status, 200);
+      assert.deepEqual(mockSyncStudentAlerts.mock.calls[0].arguments, [session.id]);
+    });
   });
 });

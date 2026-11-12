@@ -1,3 +1,4 @@
+import { linkedController } from "./abort";
 import { assertLocalDemoTarget, isDemoLocalOnlyRequired } from "./demo-local-only";
 import { randomUUID } from "crypto";
 import { buildLocalAiHeaders, DEFAULT_LOCAL_AI_AUTH_MODE } from "./local-auth";
@@ -672,7 +673,7 @@ export class OllamaProvider implements AIProvider {
     streaming: boolean,
   ): Promise<ChatFetchResult> {
     assertLocalDemoTarget(url, this.model);
-    const controller = new AbortController();
+    const controller = linkedController(init.signal);
     let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
     let timer: ReturnType<typeof setTimeout> | undefined;
 
@@ -722,6 +723,7 @@ export class OllamaProvider implements AIProvider {
     body: unknown,
     timeoutMs = OllamaProvider.GENERATE_TIMEOUT_MS,
     streaming = false,
+    signal?: AbortSignal,
   ): Promise<ChatFetchResult> {
     return this.fetchWithTimeout(
       `${this.baseUrl}/v1/chat/completions`,
@@ -729,6 +731,7 @@ export class OllamaProvider implements AIProvider {
         method: "POST",
         headers: this.headers,
         body: JSON.stringify(body),
+        signal,
       },
       timeoutMs,
       streaming,
@@ -739,6 +742,7 @@ export class OllamaProvider implements AIProvider {
     body: unknown,
     timeoutMs = OllamaProvider.GENERATE_TIMEOUT_MS,
     streaming = false,
+    signal?: AbortSignal,
   ): Promise<ChatFetchResult> {
     return this.fetchWithTimeout(
       `${this.baseUrl}/api/chat`,
@@ -746,6 +750,7 @@ export class OllamaProvider implements AIProvider {
         method: "POST",
         headers: this.headers,
         body: JSON.stringify(body),
+        signal,
       },
       timeoutMs,
       streaming,
@@ -762,12 +767,13 @@ export class OllamaProvider implements AIProvider {
     nativeBody: unknown,
     timeoutMs = OllamaProvider.GENERATE_TIMEOUT_MS,
     streaming = false,
+    signal?: AbortSignal,
   ): Promise<ChatFetchResult & { mode: OllamaApiMode }> {
     const mode = this.apiMode;
     const result =
       mode === "native"
-        ? await this.postNativeChat(nativeBody, timeoutMs, streaming)
-        : await this.postOpenAIChat(openAIBody, timeoutMs, streaming);
+        ? await this.postNativeChat(nativeBody, timeoutMs, streaming, signal)
+        : await this.postOpenAIChat(openAIBody, timeoutMs, streaming, signal);
     return { mode, ...result };
   }
 
@@ -817,6 +823,9 @@ export class OllamaProvider implements AIProvider {
         },
         keep_alive: this.keepAlive,
       },
+      OllamaProvider.GENERATE_TIMEOUT_MS,
+      false,
+      options?.signal,
     );
 
     if (!response.ok) {
@@ -939,6 +948,7 @@ export class OllamaProvider implements AIProvider {
       },
       OllamaProvider.STREAM_FIRST_BYTE_TIMEOUT_MS,
       true,
+      options?.signal,
     );
 
     if (!response.ok) {
@@ -1188,6 +1198,7 @@ export class OllamaProvider implements AIProvider {
     let yieldedAny = false;
     let outputChars = 0;
     const usageSink: UsageSink = { usage: null };
+    const signal = options?.signal;
 
     for (let attempt = 0; attempt <= STREAM_STARTUP_RETRY_DELAYS_MS.length; attempt++) {
       let yieldedThisAttempt = false;
@@ -1214,7 +1225,7 @@ export class OllamaProvider implements AIProvider {
           (!(error instanceof LocalAiStreamError) || error.retryable) &&
           isRetryableStartupError(error);
 
-        if (!canRetry) throw error;
+        if (!canRetry || signal?.aborted) throw error;
 
         const delay = STREAM_STARTUP_RETRY_DELAYS_MS[attempt];
         if (delay > 0) await sleep(delay);
@@ -1324,12 +1335,13 @@ export class OllamaProvider implements AIProvider {
     ollamaTools: OllamaToolPayload[],
     temperature?: number,
     systemPrefixLength?: number,
+    signal?: AbortSignal,
   ): AsyncGenerator<string, HopResult> {
     let lastError: unknown = null;
     let yieldedAny = false;
 
     for (let attempt = 0; attempt <= STREAM_STARTUP_RETRY_DELAYS_MS.length; attempt++) {
-      const hopGen = this.streamHopOnce(conversation, ollamaTools, temperature, systemPrefixLength);
+      const hopGen = this.streamHopOnce(conversation, ollamaTools, temperature, systemPrefixLength, signal);
 
       try {
         while (true) {
@@ -1346,7 +1358,7 @@ export class OllamaProvider implements AIProvider {
           (!(error instanceof LocalAiStreamError) || error.retryable) &&
           isRetryableStartupError(error);
 
-        if (!canRetry) throw error;
+        if (!canRetry || signal?.aborted) throw error;
 
         const delay = STREAM_STARTUP_RETRY_DELAYS_MS[attempt];
         if (delay > 0) await sleep(delay);
@@ -1389,6 +1401,7 @@ export class OllamaProvider implements AIProvider {
       for await (const text of this.streamResponse(systemPrompt, messages, options?.onUsage, {
         temperature: options?.temperature,
         systemPrefixLength: options?.systemPrefixLength,
+        signal: options?.signal,
       })) {
         yield { kind: "text", text };
       }
@@ -1408,7 +1421,7 @@ export class OllamaProvider implements AIProvider {
     for (let hop = 0; hop < maxHops; hop++) {
       // Stream one hop. The inner generator yields text strings as they
       // arrive and returns a final summary with collected tool calls.
-      const hopGen = this.streamHopWithStartupRetry(conversation, ollamaTools, options?.temperature, options?.systemPrefixLength);
+      const hopGen = this.streamHopWithStartupRetry(conversation, ollamaTools, options?.temperature, options?.systemPrefixLength, options?.signal);
       const accumulatedText: string[] = [];
       let hopResult: HopResult;
 
@@ -1502,6 +1515,7 @@ export class OllamaProvider implements AIProvider {
     ollamaTools: OllamaToolPayload[],
     temperature?: number,
     systemPrefixLength?: number,
+    signal?: AbortSignal,
   ): AsyncGenerator<string, HopResult> {
     const openAIBody = {
       model: this.model,
@@ -1533,6 +1547,7 @@ export class OllamaProvider implements AIProvider {
       nativeBody,
       OllamaProvider.STREAM_FIRST_BYTE_TIMEOUT_MS,
       true,
+      signal,
     );
 
     if (!response.ok) {
@@ -1741,6 +1756,9 @@ export class OllamaProvider implements AIProvider {
         },
         keep_alive: this.keepAlive,
       },
+      OllamaProvider.GENERATE_TIMEOUT_MS,
+      false,
+      options?.signal,
     );
 
     if (!response.ok) {

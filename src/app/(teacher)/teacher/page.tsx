@@ -10,6 +10,7 @@ import TodayRoster from "@/components/teacher/TodayRoster";
 import PageIntro from "@/components/ui/PageIntro";
 import { getTeacherHomeData } from "@/lib/teacher/dashboard";
 import { getTodayRoster } from "@/lib/teacher/today";
+import { SageAvailability } from "@/components/teacher/SageAvailability";
 
 interface TeacherDashboardProps {
   searchParams: Promise<{ classId?: string | string[] }>;
@@ -39,6 +40,7 @@ export default async function TeacherDashboard({ searchParams }: TeacherDashboar
 
   return (
     <div className="page-shell space-y-6">
+      <SageAvailability />
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <PageIntro
           eyebrow="Teacher workspace"

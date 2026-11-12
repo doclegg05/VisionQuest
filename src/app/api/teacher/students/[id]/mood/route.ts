@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { withTeacherAuth } from "@/lib/api-error";
+import { recordStudentView } from "@/lib/audit";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 
@@ -25,6 +26,13 @@ export const GET = withTeacherAuth(
         conversationId: true,
         extractedAt: true,
       },
+    });
+
+    await recordStudentView({
+      actorId: session.id,
+      actorRole: session.role,
+      targetStudentId: studentId,
+      surface: "mood",
     });
 
     return NextResponse.json({ entries });

@@ -4,17 +4,17 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowClockwise, CheckCircle, WarningCircle } from "@phosphor-icons/react";
 import { api } from "@/lib/api";
+import { FailureDetailsView, fetchFailureReason, type FailureDetailState } from "./FailedExtractionDetails";
 
 interface FailedExtractionRow {
   id: string;
   studentId: string;
   conversationId: string | null;
   extractorKey: string;
-  error: string;
   attempts: number;
   status: string;
   createdAt: string;
-  student: { displayName: string; studentId: string };
+  student: { displayName: string };
 }
 
 interface ListResponse {
@@ -78,6 +78,17 @@ function FailureRow({
   busy: boolean;
   onAction: (id: string, action: "replay" | "dismiss") => void;
 }) {
+  const [detail, setDetail] = useState<FailureDetailState>({ status: "idle" });
+
+  async function showDetail() {
+    setDetail({ status: "loading" });
+    try {
+      setDetail({ status: "loaded", reason: await fetchFailureReason(row.id) });
+    } catch {
+      setDetail({ status: "failed" });
+    }
+  }
+
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3 lg:flex-row lg:items-center">
       <WarningCircle size={24} weight="duotone" className="shrink-0 text-[var(--badge-warning-text)]" aria-hidden />
@@ -97,9 +108,7 @@ function FailureRow({
             {formatWhen(row.createdAt)} · {row.attempts} attempt{row.attempts !== 1 ? "s" : ""}
           </span>
         </div>
-        <p className="mt-0.5 line-clamp-2 text-xs text-[var(--ink-muted)]" title={row.error}>
-          {row.error}
-        </p>
+        <FailureDetailsView state={detail} onShow={() => void showDetail()} />
       </div>
 
       <div className="flex shrink-0 items-center gap-2">

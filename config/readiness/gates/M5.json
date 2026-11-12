@@ -6,7 +6,7 @@
   "doneWhen": "10 MB or less",
   "check": {
     "type": "metric",
-    "run": "node -e \"console.log((require('fs').statSync('public/media/sage-welcome-orientation.mp4').size / 1e6).toFixed(1))\"",
+    "run": "node -e \"console.log((require('fs').statSync('public/media/sage-welcome-orientation-720p-v2.mp4').size / 1e6).toFixed(1))\"",
     "baseline": 34.7,
     "target": 10,
     "direction": "atMost",

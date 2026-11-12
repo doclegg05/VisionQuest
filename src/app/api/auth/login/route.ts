@@ -1,16 +1,18 @@
 import { createHmac } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
+import type { Student } from "@prisma/client";
 import { prismaAdmin as prisma } from "@/lib/db";
 import {
   verifyPasswordSafeWithStatus,
   hashPassword,
   normalizeStudentId,
   normalizeEmail,
+  sessionCachePrimer,
   setSessionCookie,
   signMfaSessionToken,
   setMfaSessionCookie,
 } from "@/lib/auth";
-import { clientIpBucket } from "@/lib/client-ip";
+import { clientIpAddress, clientIpBucket } from "@/lib/client-ip";
 import { rateLimit } from "@/lib/rate-limit";
 import { logAuditEvent } from "@/lib/audit";
 import { withErrorHandler } from "@/lib/api-error";
@@ -18,7 +20,47 @@ import { parseBody, loginSchema } from "@/lib/schemas";
 import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { studentLogKey } from "@/lib/log-keys";
+import { passwordChangeRequired } from "@/lib/password-change-gate";
 import { getJwtSecret } from "@/lib/session-token";
+import {
+  ACCOUNT_FAILED_SIGN_IN_LIMIT,
+  SIGN_IN_WINDOW_MINUTES,
+  SIGN_IN_WINDOW_MS,
+  accountSignInLimiterKey,
+  giveBack,
+  takenUnit,
+  type TakenUnit,
+} from "@/lib/sign-in-budget";
+
+// The per-account limit, the window and the unit bookkeeping live in
+// src/lib/sign-in-budget.ts, shared with the change-password route. The
+// per-network limit below is this route's own.
+
+/**
+ * FAILED sign-ins one network address may make per window. A right password
+ * gives its unit back, so a classroom of 30 on one address can all sign in;
+ * 30 leaves each of them one mistyped try. This bucket slows one address
+ * guessing across many accounts. The address is the hop the platform's proxy
+ * appended to `X-Forwarded-For`, not the first one the caller wrote
+ * (src/lib/client-ip.ts, readiness A6).
+ *
+ * An attempt holds its unit until it is answered, so failed attempts plus
+ * attempts in flight can never pass 30. More than 30 sign-ins from one
+ * address inside the same fraction of a second would see the extra ones
+ * refused once; trying again works.
+ */
+const NETWORK_FAILED_SIGN_IN_LIMIT = 30;
+
+/**
+ * The one answer for every failed sign-in: unknown login, wrong password,
+ * locked, closed or Google-only account. One text, so the response never
+ * says which it was.
+ */
+const SIGN_IN_FAILED_MESSAGE =
+  "We could not sign you in. Check your username or email and your password, then try again. " +
+  `After too many tries, wait ${SIGN_IN_WINDOW_MINUTES} minutes or ask your instructor for help.`;
+
+const NETWORK_LIMIT_MESSAGE = `Too many sign-in tries from this location. Wait ${SIGN_IN_WINDOW_MINUTES} minutes, then try again, or ask your instructor for help.`;
 
 /**
  * Per-login limiter key for a login that names no account. An HMAC of the
@@ -34,124 +76,190 @@ function unknownLoginLimiterKey(normalizedLogin: string): string {
   return `login:unknown:${digest}`;
 }
 
-export const POST = withErrorHandler(async (req: NextRequest) => {
-  const ip = clientIpBucket(req);
-  const rl = await rateLimit(`login:${ip}`, 10, 15 * 60 * 1000);
-  if (!rl.success) {
-    return NextResponse.json({ error: "Too many login attempts. Please try again later." }, { status: 429 });
-  }
+/** Hex characters of the audit hash kept: enough to group tries, too short to be a lookup table key. */
+const LOGIN_AUDIT_HASH_CHARS = 16;
 
-  const body = await parseBody(req, loginSchema);
-  const login = body.studentId.trim();
-  const password = body.password.trim();
+/**
+ * What the audit row keeps of a login that names no account (readiness A6).
+ * People paste a password into the username box, so the typed text is never
+ * stored. A keyed hash under its own label lets staff see repeated tries of
+ * the same login without anyone being able to read or guess it back.
+ */
+function unknownLoginAuditHash(normalizedLogin: string): string {
+  return createHmac("sha256", getJwtSecret())
+    .update(`login-audit:${normalizedLogin}`)
+    .digest("hex")
+    .slice(0, LOGIN_AUDIT_HASH_CHARS);
+}
 
+/** Built fresh per request so no caller can change the shared answer. */
+function signInFailed(): NextResponse {
+  return NextResponse.json({ error: SIGN_IN_FAILED_MESSAGE }, { status: 401 });
+}
+
+/** The account a typed login names, and the login in the form both limiters key on. */
+async function findAccount(login: string): Promise<{ student: Student | null; normalizedLogin: string }> {
   const isEmail = login.includes("@");
   const normalizedLogin = isEmail ? normalizeEmail(login) : normalizeStudentId(login);
   const student = isEmail
     ? await prisma.student.findUnique({ where: { email: normalizedLogin } })
     : await prisma.student.findUnique({ where: { studentId: normalizedLogin } });
+  return { student, normalizedLogin };
+}
 
-  // Per-user rate limit — prevents distributed brute force against a single
-  // account. The refusal is deliberately NOT a 429: this route is reachable
-  // without a session, the login is not a secret, and the per-IP bucket is 10
-  // while this one is 5 — so a distinct status on the sixth attempt told an
-  // anonymous caller whether the account exists, for six cheap requests per
-  // address (2026-09-06 hunt, follow-up 1). A locked account now answers
-  // exactly like a wrong password and exactly like an unknown login, the
-  // attempt is still counted above, and the limit itself is unchanged.
-  // Precedent and identical reasoning: reset-password/questions/route.ts.
-  //
-  // The limiter round trip runs for unknown logins too (2026-10-22 scan, F12):
-  // it ran only for real accounts, so they answered one database round trip
-  // slower, which the dummy KDF below could not hide. A real account stays
-  // keyed on its id, so its email and student-ID aliases share one budget. The
-  // unknown-login key is computed on every request so both paths do the same
-  // work and fail alike. An unknown login can never sign in, so its spent
-  // bucket changes nothing it is told; only a real account counts as locked.
+interface AccountAttempt {
+  /** True only for a real account past its limit. */
+  locked: boolean;
+  /** The per-account unit this attempt took, or null when the limiter failed open. */
+  unit: TakenUnit | null;
+}
+
+/**
+ * Per-user rate limit — prevents distributed brute force against a single
+ * account. Counts this attempt and answers whether the account is locked.
+ *
+ * The refusal is deliberately NOT a 429: this route is reachable without a
+ * session, the login is not a secret, and the per-IP bucket is larger than
+ * this one — so a distinct status on the sixth attempt told an anonymous
+ * caller whether the account exists, for six cheap requests per address
+ * (2026-09-06 hunt, follow-up 1). A locked account now answers exactly like a
+ * wrong password and exactly like an unknown login, the attempt is still
+ * counted here, and the limit itself is unchanged. Precedent and identical
+ * reasoning: reset-password/questions/route.ts.
+ *
+ * The limiter round trip runs for unknown logins too (2026-10-22 scan, F12):
+ * it ran only for real accounts, so they answered one database round trip
+ * slower, which the dummy KDF could not hide. A real account stays keyed on
+ * its id, so its email and student-ID aliases share one budget. The
+ * unknown-login key is computed on every request so both paths do the same
+ * work and fail alike. An unknown login can never sign in, so its spent
+ * bucket changes nothing it is told; only a real account counts as locked.
+ *
+ * The unit this attempt took is answered too, so a right password can give
+ * it back (see `giveBack`). An unknown login never reaches that point.
+ */
+async function countAccountAttempt(student: Student | null, normalizedLogin: string): Promise<AccountAttempt> {
   const unknownLoginKey = unknownLoginLimiterKey(normalizedLogin);
-  const userRl = await rateLimit(
-    student ? `login:user:${student.id}` : unknownLoginKey,
-    5,
-    15 * 60 * 1000,
-  );
-  const accountLocked = student !== null && !userRl.success;
+  const accountKey = student ? accountSignInLimiterKey(student.id) : unknownLoginKey;
+  const userRl = await rateLimit(accountKey, ACCOUNT_FAILED_SIGN_IN_LIMIT, SIGN_IN_WINDOW_MS);
+  return { locked: student !== null && !userRl.success, unit: takenUnit(accountKey, userRl) };
+}
 
-  // Consolidate all failure cases into a single generic response to prevent account enumeration.
-  // Do not distinguish between: no account found, OAuth-only account, wrong password, or inactive account.
-  const isOAuthOnly = student && !student.passwordHash && student.authProvider === "google";
-  // Always run the KDF to equalize timing and avoid an account-enumeration oracle.
-  const { valid: passwordMatches, needsRehash } = verifyPasswordSafeWithStatus(
-    password,
-    student?.passwordHash ?? null,
-  );
-  const isInvalidCredentials =
-    !student || !student.passwordHash || !passwordMatches || !student.isActive;
+interface FailedSignIn {
+  login: string;
+  normalizedLogin: string;
+  ip: string;
+  student: Student | null;
+  accountLocked: boolean;
+  isOAuthOnly: boolean;
+}
 
-  if (accountLocked || isOAuthOnly || isInvalidCredentials) {
-    // The response says nothing the caller could not already guess; the audit
-    // log, which only staff read, keeps the three cases apart.
-    const failureStudent = accountLocked || isOAuthOnly ? student : null;
-    const action = accountLocked
-      ? "auth.login_failed_rate_limited"
-      : isOAuthOnly
-        ? "auth.login_failed_oauth"
-        : "auth.login_failed";
-    await logAuditEvent({
-      actorId: failureStudent?.id ?? null,
-      actorRole: failureStudent?.role ?? null,
-      action,
-      targetType: "student",
-      targetId: failureStudent?.id,
-      summary: accountLocked
-        ? `Failed login attempt for "${login}" — refused, per-account attempt limit reached.`
-        : `Failed login attempt for "${login}".`,
-      metadata: { ip },
-    });
-    return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
+/**
+ * The response says nothing the caller could not already guess; the audit
+ * log, which only staff read, keeps the three cases apart.
+ */
+async function auditFailedSignIn(attempt: FailedSignIn): Promise<void> {
+  const { student, accountLocked, isOAuthOnly } = attempt;
+  const failureStudent = accountLocked || isOAuthOnly ? student : null;
+  const action = accountLocked
+    ? "auth.login_failed_rate_limited"
+    : isOAuthOnly
+      ? "auth.login_failed_oauth"
+      : "auth.login_failed";
+  await logAuditEvent({
+    actorId: failureStudent?.id ?? null,
+    actorRole: failureStudent?.role ?? null,
+    action,
+    targetType: "student",
+    targetId: failureStudent?.id,
+    ...failedSignInRecord(attempt),
+  });
+}
+
+/**
+ * The summary and metadata of a failed sign-in. A login that names an account
+ * is not written: the row's target id already says which account, and audit
+ * summaries carry no login (H15). One that names no account is kept only as a
+ * hash, because it may be a password typed in the wrong box.
+ */
+function failedSignInRecord({ normalizedLogin, ip, student, accountLocked }: FailedSignIn): {
+  summary: string;
+  metadata: Record<string, string>;
+} {
+  if (!student) {
+    return {
+      summary: "Failed login attempt for a login that names no account.",
+      metadata: { ip, loginHash: unknownLoginAuditHash(normalizedLogin) },
+    };
   }
+  return {
+    summary: accountLocked
+      ? "Failed login attempt. Refused: the account's attempt limit was reached."
+      : "Failed login attempt.",
+    metadata: { ip },
+  };
+}
 
-  // Silent migration: if the stored hash used the legacy PBKDF2 format,
-  // rehash with the current scrypt format. Failures here must not block
-  // login — the user is already authenticated with the legacy hash.
-  if (needsRehash && student) {
-    try {
-      const { hash: newHash } = hashPassword(password);
-      // Never restore the old password over a concurrent reset/change.
-      const migrated = await prisma.student.updateMany({
-        where: { id: student.id, passwordHash: student.passwordHash },
-        data: { passwordHash: newHash },
-      });
-      if (migrated.count !== 1) {
-        return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
-      }
-    } catch (err) {
-      logger.warn("Password rehash failed", { student: studentLogKey(student.id), error: errorForLog(err) });
-    }
-  }
-
-  // If MFA is enabled, set the short-lived MFA challenge cookie and return a
-  // partial response. The cookie is httpOnly + scoped to /api/auth/mfa, so it
-  // cannot be stolen via pre-session XSS and only travels to challenge routes.
-  if (student.mfaEnabled) {
-    const mfaSessionToken = signMfaSessionToken(student.id, student.role, student.sessionVersion);
-    await setMfaSessionCookie(mfaSessionToken);
-
-    await logAuditEvent({
-      actorId: student.id,
-      actorRole: student.role,
-      action: "auth.login_mfa_required",
-      targetType: "student",
-      targetId: student.id,
-      summary: `Password verified for ${student.studentId} — MFA challenge required.`,
-      metadata: { ip },
+/**
+ * Silent migration: the stored hash used the legacy PBKDF2 format, so rehash
+ * with the current scrypt format. Answers false only when a concurrent reset
+ * or change won the write: never restore the old password over it. A failure
+ * here must not block login — the user is already authenticated with the
+ * legacy hash — so it is logged and answers true.
+ */
+async function upgradeLegacyHash(student: Student, password: string): Promise<boolean> {
+  try {
+    const { hash: newHash } = await hashPassword(password);
+    const migrated = await prisma.student.updateMany({
+      where: { id: student.id, passwordHash: student.passwordHash },
+      data: { passwordHash: newHash },
     });
-
-    return NextResponse.json({
-      requiresMfa: true,
-    });
+    return migrated.count === 1;
+  } catch (err) {
+    logger.warn("Password rehash failed", { student: studentLogKey(student.id), error: errorForLog(err) });
+    return true;
   }
+}
 
-  await setSessionCookie(student.id, student.role, student.sessionVersion);
+/**
+ * MFA is enabled: set the short-lived MFA challenge cookie and return a
+ * partial response. The cookie is httpOnly + scoped to /api/auth/mfa, so it
+ * cannot be stolen via pre-session XSS and only travels to challenge routes.
+ */
+async function startMfaChallenge(student: Student, ip: string): Promise<NextResponse> {
+  const mfaSessionToken = signMfaSessionToken(student.id, student.role, student.sessionVersion);
+  await setMfaSessionCookie(mfaSessionToken);
+
+  await logAuditEvent({
+    actorId: student.id,
+    actorRole: student.role,
+    action: "auth.login_mfa_required",
+    targetType: "student",
+    targetId: student.id,
+    summary: `Password verified; MFA challenge required.`,
+    metadata: { ip },
+  });
+
+  return NextResponse.json({
+    requiresMfa: true,
+  });
+}
+
+async function startSession(
+  student: Student,
+  ip: string,
+  primeSessionCache: (row: Student) => void,
+): Promise<NextResponse> {
+  // True while the account still holds a password somebody else chose: one
+  // staff typed when they made the account or reset it. The session is
+  // issued either way, and a true answer holds it to the change-password
+  // screen, enforced in src/proxy.ts for every page and API route.
+  const mustChangePassword = passwordChangeRequired(student);
+  await setSessionCookie(student.id, student.role, student.sessionVersion, { mustChangePassword });
+  // The row was read and checked just now, so the first page after sign-in
+  // does not read it again. The primer stores nothing if the account was
+  // changed since it was read (see `sessionCachePrimer`).
+  primeSessionCache(student);
 
   await logAuditEvent({
     actorId: student.id,
@@ -159,7 +267,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     action: "auth.login",
     targetType: "student",
     targetId: student.id,
-    summary: `Login successful for ${student.studentId}.`,
+    summary: `Login successful.`,
     metadata: { ip },
   });
 
@@ -169,12 +277,57 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       studentId: student.studentId,
       displayName: student.displayName,
       role: student.role,
-      // True while the account still holds a password somebody else chose —
-      // today, one issued by SPOKES intake. A prompt for the client, not a
-      // gate: the session above is already set, and nothing server-side
-      // refuses a request while this is true. Server-side enforcement needs a
-      // self-service change-password surface, which does not exist yet.
-      mustChangePassword: student.mustChangePassword,
+      // For a client that wants to go straight to the change screen. The
+      // gate does not depend on it: the proxy holds the session regardless.
+      mustChangePassword,
     },
   });
+}
+
+export const POST = withErrorHandler(async (req: NextRequest) => {
+  const ip = clientIpAddress(req);
+  // Every attempt takes a unit first, in one atomic statement, so a burst of
+  // guesses cannot race past the limit. A right password gives it back below.
+  const networkKey = `login:${clientIpBucket(req)}`;
+  const networkRl = await rateLimit(networkKey, NETWORK_FAILED_SIGN_IN_LIMIT, SIGN_IN_WINDOW_MS);
+  if (!networkRl.success) {
+    return NextResponse.json({ error: NETWORK_LIMIT_MESSAGE }, { status: 429 });
+  }
+
+  const body = await parseBody(req, loginSchema);
+  const login = body.studentId.trim();
+  const password = body.password.trim();
+  // Taken before the account is read, so it can tell if the row goes stale.
+  const primeSessionCache = sessionCachePrimer();
+  const { student, normalizedLogin } = await findAccount(login);
+  const { locked: accountLocked, unit: accountUnit } = await countAccountAttempt(student, normalizedLogin);
+
+  // Consolidate all failure cases into a single generic response to prevent account enumeration.
+  // Do not distinguish between: no account found, OAuth-only account, wrong password, or inactive account.
+  const isOAuthOnly = student !== null && !student.passwordHash && student.authProvider === "google";
+  // Always run the KDF to equalize timing and avoid an account-enumeration oracle.
+  const { valid: passwordMatches, needsRehash } = await verifyPasswordSafeWithStatus(
+    password,
+    student?.passwordHash ?? null,
+  );
+  const isInvalidCredentials =
+    !student || !student.passwordHash || !passwordMatches || !student.isActive;
+
+  if (accountLocked || isOAuthOnly || isInvalidCredentials) {
+    await auditFailedSignIn({ login, normalizedLogin, ip, student, accountLocked, isOAuthOnly });
+    return signInFailed();
+  }
+
+  if (needsRehash && !(await upgradeLegacyHash(student, password))) {
+    return signInFailed();
+  }
+
+  // The password was right, and both answers below say so. Give the network
+  // and the account unit back here and nowhere earlier: every refusal above
+  // answers the same 401 whatever the password was, so a unit that came back
+  // for a locked, closed or Google-only account would let the caller read
+  // "right password" off a count, past the per-account lock (see `giveBack`).
+  await giveBack([takenUnit(networkKey, networkRl), accountUnit]);
+
+  return student.mfaEnabled ? startMfaChallenge(student, ip) : startSession(student, ip, primeSessionCache);
 });

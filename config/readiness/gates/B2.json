@@ -5,6 +5,11 @@
   "title": "An unplaced instructor is not stranded",
   "doneWhen": "Tests cover the unplaced state end to end.",
   "check": {
-    "type": "pending"
+    "type": "test",
+    "files": [
+      "src/components/staff/UnplacedStaffNotice.test.tsx",
+      "src/components/teacher/CreateClassGate.test.tsx",
+      "src/lib/org-placement.unplaced-flow.test.ts"
+    ]
   }
 }

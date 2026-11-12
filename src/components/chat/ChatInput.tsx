@@ -1,12 +1,84 @@
 "use client";
 
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useImperativeHandle, useRef, useState, type Ref } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { Command, PaperPlaneTilt, Plus } from "@phosphor-icons/react";
+import { Command, PaperPlaneTilt, Plus, Stop } from "@phosphor-icons/react";
+import { WarningCircle } from "@phosphor-icons/react/dist/ssr";
+import { AiCanBeWrongLine } from "./AiCanBeWrongLine";
 import { CommandPalette } from "./CommandPalette";
 import { useDemoAccount } from "@/components/demo/DemoAccountContext";
 import { DemoPrivacyNotice } from "@/components/demo/DemoPrivacyNotice";
 import { chatRoleCanAttachFiles, type ChatRole, type SlashCommand } from "@/lib/chat/commands";
+
+/**
+ * What the chat upload route accepts (`validateFile` in src/lib/storage.ts,
+ * which cannot be imported into a client bundle). ChatInput.test.tsx fails
+ * if the two lists drift apart.
+ */
+const CHAT_UPLOAD_TYPES = ["application/pdf", "image/jpeg", "image/png", "image/gif"];
+const CHAT_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
+export const CHAT_UPLOAD_ACCEPT = CHAT_UPLOAD_TYPES.join(",");
+
+const PICK_A_FILE = "Pick a PDF, JPG, PNG or GIF file.";
+
+/** Why the server would refuse this file, in words a student can act on; null if it would not. */
+export function uploadProblemFor(file: { size: number; type: string }): string | null {
+  if (!Number.isFinite(file.size) || file.size <= 0) return `This file is empty. ${PICK_A_FILE}`;
+  if (file.size > CHAT_UPLOAD_MAX_BYTES) return "This file is too big. Pick a file smaller than 10 MB.";
+  if (!CHAT_UPLOAD_TYPES.includes(file.type)) return `Sage cannot open this kind of file. ${PICK_A_FILE}`;
+  return null;
+}
+
+/** The upload failed on the server or on the way there; `status` is null when no answer came back. */
+export function uploadFailureMessage(status: number | null): string {
+  // The upload route allows 20 files per rolling hour (src/app/api/chat/upload/route.ts).
+  if (status === 429) return "You sent a lot of files this hour. Try again in one hour.";
+  if (status !== null && status >= 400 && status < 500) {
+    return `This file did not upload. ${PICK_A_FILE} Keep it under 10 MB, then try again.`;
+  }
+  return "This file did not upload. Check that you are online, then try again.";
+}
+
+/** A failed upload, read out by screen readers and wrapped to fit a 375px screen. */
+export function UploadError({ message }: { message: string }) {
+  return (
+    <p
+      role="alert"
+      className="mb-2 flex items-start gap-2 min-w-0 break-words rounded-xl border border-[var(--chat-error-border)] bg-[var(--chat-error-bg)] px-3 py-2 text-sm text-[var(--chat-error-text)]"
+    >
+      <WarningCircle size={20} weight="bold" aria-hidden="true" className="shrink-0" />
+      <span className="min-w-0">{message}</span>
+    </p>
+  );
+}
+
+/**
+ * Ends Sage's answer. Neutral colors: stopping is the student's choice, not
+ * an error. The visible word is the button's name. Until the chat arms it
+ * (stopArmed in wait-and-stop.ts) it is aria-disabled and drawn dimmed with
+ * no hover change, since a phone shows no wait cursor. A press still goes to
+ * the chat, whose gate (send-abort.ts) ignores a second tap on Send and
+ * holds a later press until the stream's first event, so the 988 help is
+ * not lost.
+ */
+export function StopButton({ onStop, armed = false }: { onStop: () => void; armed?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onStop}
+      aria-disabled={armed ? undefined : true}
+      className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-full border border-[var(--chat-panel-border)] bg-[var(--chat-panel-bg)] px-4 text-sm font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-interactive)] aria-disabled:cursor-wait aria-disabled:opacity-70 aria-disabled:hover:bg-[var(--chat-panel-bg)]"
+    >
+      <Stop size={16} weight="fill" aria-hidden="true" />
+      <span>Stop</span>
+    </button>
+  );
+}
+
+/** What the chat may do with the message box. */
+export interface MessageBoxHandle {
+  focus(): void;
+}
 
 interface ChatInputProps {
   onSend: (message: string, attachmentIds?: string[]) => void;
@@ -15,9 +87,15 @@ interface ChatInputProps {
   role?: ChatRole;
   /** Text placed in the box on mount. It is only sent when the user presses Send. */
   initialMessage?: string;
+  /** Lets the chat put focus in the message box, such as after Try again. */
+  messageBoxRef?: Ref<MessageBoxHandle>;
+  /** While Sage answers (`disabled`), a Stop button takes Send's place. */
+  onStop?: () => void;
+  /** Stop does something only once the chat arms it (wait-and-stop.ts). */
+  stopArmed?: boolean;
 }
 
-export default function ChatInput({ onSend, disabled, compact, role = "student", initialMessage }: ChatInputProps) {
+export default function ChatInput({ onSend, disabled, compact, role = "student", initialMessage, messageBoxRef, onStop, stopArmed = false }: ChatInputProps) {
   const canAttachFiles = chatRoleCanAttachFiles(role);
   const [message, setMessage] = useState(initialMessage ?? "");
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -25,8 +103,11 @@ export default function ChatInput({ onSend, disabled, compact, role = "student",
   const [focused, setFocused] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [attachments, setAttachments] = useState<{ id: string; filename: string }[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // Hands the same box to the chat, which focuses it after Try again.
+  useImperativeHandle(messageBoxRef, () => ({ focus: () => textareaRef.current?.focus() }), []);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const prevDisabledRef = useRef(disabled);
   const commandListboxId = useId();
@@ -179,6 +260,13 @@ export default function ChatInput({ onSend, disabled, compact, role = "student",
       event.target.value = "";
       if (!file || disabled) return;
 
+      setUploadError(null);
+      const problem = uploadProblemFor(file);
+      if (problem) {
+        setUploadStatus(null);
+        setUploadError(problem);
+        return;
+      }
       setUploading(true);
       setUploadStatus(`Uploading ${file.name}...`);
       try {
@@ -191,7 +279,9 @@ export default function ChatInput({ onSend, disabled, compact, role = "student",
         });
         const data = await res.json().catch(() => null);
         if (!res.ok) {
-          throw new Error(data?.error || "Could not upload that file.");
+          setUploadStatus(null);
+          setUploadError(uploadFailureMessage(res.status));
+          return;
         }
 
         const filename = data?.data?.filename || file.name;
@@ -199,10 +289,12 @@ export default function ChatInput({ onSend, disabled, compact, role = "student",
           ...current,
           { id: data.data.fileUploadId as string, filename },
         ]);
-        setUploadStatus(`${filename} attached — send your message and Sage will see it.`);
+        setUploadStatus(`${filename} is attached. Send your message and Sage will see it.`);
         requestAnimationFrame(() => textareaRef.current?.focus());
       } catch (error) {
-        setUploadStatus(error instanceof Error ? error.message : "Could not upload that file.");
+        console.error("Chat upload failed:", error instanceof Error ? error.name : "Unknown error");
+        setUploadStatus(null);
+        setUploadError(uploadFailureMessage(null));
       } finally {
         setUploading(false);
       }
@@ -239,9 +331,11 @@ export default function ChatInput({ onSend, disabled, compact, role = "student",
             ))}
           </div>
         )}
+        {uploadError && <UploadError message={uploadError} />}
         <input
           ref={fileInputRef}
           type="file"
+          accept={CHAT_UPLOAD_ACCEPT}
           className="hidden"
           onChange={handleFileChange}
           aria-label="Upload file"
@@ -255,7 +349,6 @@ export default function ChatInput({ onSend, disabled, compact, role = "student",
             focused
               ? "border-[var(--chat-sage-mark)] shadow-[0_0_0_3px_var(--chat-composer-focus)]"
               : "border-[var(--chat-panel-border)]",
-            disabled ? "opacity-75" : "",
             compact ? "rounded-xl" : "",
           ]
             .filter(Boolean)
@@ -280,7 +373,11 @@ export default function ChatInput({ onSend, disabled, compact, role = "student",
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
             placeholder={role === "student" ? "Message Sage…" : "Message Sage…"}
-            disabled={disabled}
+            // Read-only rather than disabled while Sage answers: a disabled
+            // box drops focus to the page, and after Try again focus must
+            // stay in the message box.
+            readOnly={disabled}
+            aria-disabled={disabled || undefined}
             rows={1}
             role="combobox"
             aria-label="Message to Sage"
@@ -289,7 +386,9 @@ export default function ChatInput({ onSend, disabled, compact, role = "student",
             aria-expanded={paletteOpen}
             className={[
               "custom-scrollbar relative w-full resize-none border-0 bg-transparent text-[var(--ink-strong)] placeholder:text-[var(--ink-muted)]",
-              "focus:outline-none focus:ring-0 focus-visible:outline-none disabled:cursor-not-allowed overflow-y-auto",
+              "focus:outline-none focus:ring-0 focus-visible:outline-none aria-disabled:cursor-not-allowed overflow-y-auto",
+              // The fade is here and on the other buttons, not the composer, so Stop stays full strength.
+              disabled ? "opacity-75" : "",
               compact ? "min-h-[40px] px-3 pb-1 pt-2.5 text-sm" : "min-h-[52px] px-4 py-3 text-[15px] leading-6",
             ].join(" ")}
           />
@@ -332,25 +431,30 @@ export default function ChatInput({ onSend, disabled, compact, role = "student",
               {uploadStatus || (compact ? "Enter sends" : "Enter to send · Shift+Enter for a new line")}
             </p>
 
-            <motion.button
-              onClick={handleSubmit}
-              disabled={disabled || !canSend}
-              aria-label="Send message"
-              type="button"
-              title="Send"
-              whileTap={reduce || disabled || !canSend ? undefined : { scale: 0.92 }}
-              transition={{ type: "spring", stiffness: 500, damping: 25 }}
-              className={[
-                "grid h-11 w-11 shrink-0 place-items-center rounded-full transition-colors",
-                canSend && !disabled
-                  ? "bg-[var(--accent-strong)] text-[var(--on-accent)] shadow-[0_8px_18px_rgba(55,181,80,0.28)] hover:opacity-95"
-                  : "cursor-not-allowed bg-[var(--surface-interactive)] text-[var(--ink-muted)] shadow-none",
-              ].join(" ")}
-            >
-              <PaperPlaneTilt size={compact ? 18 : 20} weight="fill" />
-            </motion.button>
+            {disabled && onStop ? (
+              <StopButton onStop={onStop} armed={stopArmed} />
+            ) : (
+              <motion.button
+                onClick={handleSubmit}
+                disabled={disabled || !canSend}
+                aria-label="Send message"
+                type="button"
+                title="Send"
+                whileTap={reduce || disabled || !canSend ? undefined : { scale: 0.92 }}
+                transition={{ type: "spring", stiffness: 500, damping: 25 }}
+                className={[
+                  "grid h-11 w-11 shrink-0 place-items-center rounded-full transition-colors",
+                  canSend && !disabled
+                    ? "bg-[var(--accent-strong)] text-[var(--on-accent)] shadow-[0_8px_18px_rgba(55,181,80,0.28)] hover:opacity-95"
+                    : "cursor-not-allowed bg-[var(--surface-interactive)] text-[var(--ink-muted)] shadow-none",
+                ].join(" ")}
+              >
+                <PaperPlaneTilt size={compact ? 18 : 20} weight="fill" />
+              </motion.button>
+            )}
           </div>
         </div>
+        <AiCanBeWrongLine showLink={Boolean(compact) && role === "student"} />
         {demoAccount === "student" && (
           <div className="mt-2 px-1">
             <DemoPrivacyNotice />

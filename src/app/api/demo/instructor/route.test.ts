@@ -128,14 +128,14 @@ describe("POST /api/demo/instructor", () => {
   });
 
   it("sets a demo session cookie and returns the redirect", async () => {
-    const response = await route.POST(post({ "x-forwarded-for": "203.0.113.9" }) as never);
+    const response = await route.POST(post({ "x-forwarded-for": `203.0.113.9, 172.70.1.9` }) as never);
 
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { redirectTo: "/teacher" });
     assert.equal(cookieCalls.length, 1);
     assert.equal(cookieCalls[0][0], "instr-1");
     assert.equal(cookieCalls[0][1], "teacher");
-    assert.deepEqual(cookieCalls[0][3], { demo: "instructor" });
+    assert.deepEqual(cookieCalls[0][3], { demo: "instructor", mustChangePassword: false });
   });
 
   it("signs the session with the instructor's current version, not the remembered one", async () => {
@@ -147,7 +147,7 @@ describe("POST /api/demo/instructor", () => {
   });
 
   it("limits each network to 30 sign-ins in 15 minutes under the demo-instructor key", async () => {
-    await route.POST(post({ "x-forwarded-for": "203.0.113.9" }) as never);
+    await route.POST(post({ "x-forwarded-for": `203.0.113.9, 172.70.1.9` }) as never);
 
     assert.deepEqual(rateLimitCalls, [["demo-instructor:203.0.113.9", 30, FIFTEEN_MINUTES_MS]]);
   });
@@ -182,7 +182,7 @@ describe("POST /api/demo/instructor", () => {
     assert.deepEqual(await response.json(), { redirectTo: "/teacher" });
     assert.equal(cookieCalls.length, 1, "the session cookie is set");
     assert.equal(cookieCalls[0][0], "instr-1");
-    assert.deepEqual(cookieCalls[0][3], { demo: "instructor" });
+    assert.deepEqual(cookieCalls[0][3], { demo: "instructor", mustChangePassword: false });
     assert.equal(auditRows.length, 0);
     assert.ok(
       JSON.stringify(errorLogs).includes("audit_write_failed"),

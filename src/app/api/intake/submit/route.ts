@@ -4,6 +4,7 @@ import { intakePayloadSchema } from "@/lib/intake/schema";
 import { provisionIntakeStudent } from "@/lib/intake/provision";
 import { withErrorHandler } from "@/lib/api-error";
 import { parseBody } from "@/lib/schemas";
+import { clientIpBucket } from "@/lib/client-ip";
 import { rateLimit } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
 
@@ -24,8 +25,12 @@ import { logger } from "@/lib/logger";
  * (M16/M17). Staff hand over sign-in details in person.
  */
 
-/** Per-network bucket. Generous: a whole classroom may enroll at one address. */
-const IP_LIMIT_ATTEMPTS = 15;
+/**
+ * Per-network bucket. 40 fits a class of 30 on one address sending the form
+ * with ten resubmits to spare; at 15 the sixteenth student was refused.
+ * Every request counts, refused ones too.
+ */
+const IP_LIMIT_ATTEMPTS = 40;
 const IP_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 
 /**
@@ -89,7 +94,7 @@ function applicantKey(firstName: string, lastName: string, birthDate: string): s
 }
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const ip = clientIpBucket(req);
   const ipLimit = await rateLimit(`intake:submit:ip:${ip}`, IP_LIMIT_ATTEMPTS, IP_LIMIT_WINDOW_MS);
   if (!ipLimit.success) {
     return NextResponse.json({ error: THROTTLED_MESSAGE }, { status: 429 });

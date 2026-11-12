@@ -48,7 +48,7 @@ const mockLoggerInfo = mock.fn() as any;
 
 // Spy on the password update made inside $transaction so we can assert that
 // it received a hashed value rather than the raw password.
-const studentUpdateCalls: { id: string; passwordHash?: string }[] = [];
+const studentUpdateCalls: { id: string; passwordHash?: string; mustChangePassword?: boolean }[] = [];
 const tokenMarkUsedCalls: unknown[] = [];
 
 mock.module("@/lib/db", {
@@ -97,13 +97,14 @@ mock.module("@/lib/logger", {
 
 let resetPasswordRoute: Awaited<typeof import("../route")>;
 let verifyMfaSessionToken: (token: string) => { sub: string; role: string; sv: number; purpose: string } | null;
+let verifyToken: typeof import("@/lib/auth").verifyToken;
 let originalJwtSecret: string | undefined;
 
 before(async () => {
   originalJwtSecret = process.env.JWT_SECRET;
   process.env.JWT_SECRET = TEST_JWT_SECRET;
   resetPasswordRoute = await import("../route");
-  ({ verifyMfaSessionToken } = await import("@/lib/auth"));
+  ({ verifyMfaSessionToken, verifyToken } = await import("@/lib/auth"));
 });
 
 after(() => {
@@ -130,8 +131,12 @@ function installTransaction(account: { role: string; mfaEnabled: boolean }) {
         deleteMany: async () => ({ count: 0 }),
       },
       student: {
-        update: async (args: { where: { id: string }; data: { passwordHash?: string } }) => {
-          studentUpdateCalls.push({ id: args.where.id, passwordHash: args.data.passwordHash });
+        update: async (args: { where: { id: string }; data: { passwordHash?: string; mustChangePassword?: boolean } }) => {
+          studentUpdateCalls.push({
+            id: args.where.id,
+            passwordHash: args.data.passwordHash,
+            mustChangePassword: args.data.mustChangePassword,
+          });
           return {
             id: args.where.id,
             role: account.role,
@@ -207,6 +212,28 @@ describe("POST /api/auth/reset-password", () => {
     assert.match(setCookie, new RegExp(`(^|, )${SESSION_COOKIE}=`), "expected the session cookie to be set");
     assert.ok(!setCookie.includes(`${MFA_COOKIE}=`), "no MFA challenge cookie for a non-MFA account");
     assert.ok(cookieJar.get(SESSION_COOKIE)?.value, "session cookie carries a token");
+  });
+
+  // Staff set a student's first password and every reset, and the account is
+  // then held to the change-password screen (readiness A3). A password set
+  // through an emailed link is one the student chose, so the hold ends with
+  // this write, and the session issued next carries no claim.
+  it("clears the must-change-password flag and issues a session that is not held", async () => {
+    mockFindUnique.mock.mockImplementation(async () => validResetRecord({ id: "stu-1", role: "student" }));
+
+    const res = await resetPasswordRoute.POST(
+      mockRequest("/api/auth/reset-password", {
+        method: "POST",
+        body: { token: "good-token", password: "fresh-password-123" },
+      }) as never,
+    );
+
+    assert.equal(res.status, 200);
+    assert.equal(studentUpdateCalls[0]?.mustChangePassword, false);
+    const claims = verifyToken(cookieJar.get(SESSION_COOKIE)?.value ?? "");
+    assert.ok(claims, "the session cookie holds a verifiable token");
+    assert.equal(claims.sv, 2);
+    assert.equal("mustChangePassword" in claims, false);
   });
 
   it("sets the MFA challenge cookie and NO session cookie when the account has MFA enabled", async () => {
@@ -330,5 +357,44 @@ describe("POST /api/auth/reset-password", () => {
     assert.equal(mockFindUnique.mock.callCount(), 0, "schema validation should run before DB read");
     assert.equal(studentUpdateCalls.length, 0);
     assert.equal(setCookieHeader(), "", "no cookie of any kind on refusal");
+  });
+
+  // --- Per-network limit sized for a classroom (A1 security review) ---------
+  //
+  // The bucket counted every request at 10 an hour, so the eleventh student
+  // in one classroom to open an emailed link was refused. The link's token is
+  // 32 random bytes, so this limit stops no guessing; it only blocked
+  // classmates. 30 lets a class of 30 on one address each use a link.
+
+  function linkReset(address: string) {
+    return resetPasswordRoute.POST(
+      mockRequest("/api/auth/reset-password", {
+        method: "POST",
+        body: { token: "good-token", password: "a-long-new-password" },
+        headers: { "x-forwarded-for": `${address}, 172.70.1.9` },
+      }) as never,
+    );
+  }
+
+  it("allows one network address 30 link resets per hour", async () => {
+    mockFindUnique.mock.mockImplementation(async () => validResetRecord({ id: "stu-1", role: "student" }));
+
+    await linkReset("203.0.113.30");
+
+    assert.deepEqual(mockRateLimit.mock.calls[0].arguments, ["reset-password:203.0.113.30", 30, 60 * 60 * 1000]);
+  });
+
+  it("returns 429 once the address has used its link resets, before the token is read", async () => {
+    mockRateLimit.mock.mockImplementation(async () => ({
+      success: false,
+      remaining: 0,
+      resetTime: Date.now() + 60_000,
+    }));
+
+    const res = await linkReset("203.0.113.30");
+
+    assert.equal(res.status, 429);
+    assert.equal(mockFindUnique.mock.callCount(), 0);
+    assert.equal(studentUpdateCalls.length, 0);
   });
 });

@@ -39,6 +39,10 @@ export const GET = withTeacherAuth(async (
       description: true,
       startDate: true,
       endDate: true,
+      // Readable by any signed-in user under RLS region_read; the caller can
+      // already manage this class, so this adds only which region it is in.
+      regionId: true,
+      region: { select: { id: true, name: true } },
       instructors: {
         select: {
           instructor: {
@@ -145,12 +149,19 @@ export const PATCH = withTeacherAuth(async (
         // Creating a class requires a region, and a regionless class is hidden
         // from the regional coordinator. Only whole-state roles may unset it.
         if (!seesWholeState(session.role)) {
-          throw forbidden("Only an admin can remove a classroom from its region.");
+          throw forbidden("Only an admin can remove a class from its region.");
         }
         nextRegionId = null;
       } else if (body.regionId.trim()) {
-        // The same rule as creating a class: an instructor may use only a
-        // region they belong to; whole-state roles may use any active region.
+        // Moving a class takes it from one region's coordinators and shows
+        // every enrolled student's records to another's, so only an admin may
+        // change the region. An instructor may be placed in two regions, and
+        // assertRegionAllowed alone would let them move a class between the
+        // two. Repeating the class's current region is not a move.
+        if (body.regionId !== existing.regionId && session.role !== "admin") {
+          throw forbidden("Only an admin can move a class to another region.");
+        }
+        // Still needed for the admin: the region must exist and be active.
         await assertRegionAllowed(session, body.regionId);
         nextRegionId = body.regionId;
       } else {
@@ -250,6 +261,8 @@ export const PATCH = withTeacherAuth(async (
         code: nextCode,
         status: nextStatus,
         instructorCount: instructorIds?.length ?? null,
+        previousRegionId: existing.regionId,
+        regionId: nextRegionId !== undefined ? nextRegionId : existing.regionId,
       },
     });
 

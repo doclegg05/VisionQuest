@@ -88,7 +88,7 @@ describe("PATCH /api/teacher/classes/[id] regionId", () => {
   it("refuses an instructor who sends regionId null, with 403 and no update", async () => {
     const res = await patch({ regionId: null });
     assert.equal(res.status, 403);
-    assert.equal((await res.json()).error, "Only an admin can remove a classroom from its region.");
+    assert.equal((await res.json()).error, "Only an admin can remove a class from its region.");
     assert.equal(classUpdate.mock.callCount(), 0);
   });
 
@@ -143,11 +143,15 @@ describe("PATCH /api/teacher/classes/[id] instructorIds", () => {
     assert.equal(res.status, 200);
   });
 
-  it("checks co-teachers against the region the class is moving to", async () => {
+  // This case used to expect 400 from the co-teacher check, under the old rule
+  // that a teacher could move a class between regions they are in. The B1
+  // security audit (2026-11-10) made any move admin-only, so the teacher is
+  // refused before co-teachers are looked at. The write is still never made.
+  it("refuses a teacher moving the class before any co-teacher check", async () => {
     regionMembers.add(`${REGION_B}:${SELF}`);
     regionInstructorFindMany.mock.mockImplementation(async () => [{ regionId: REGION_A }, { regionId: REGION_B }]);
     const res = await patch({ regionId: REGION_B, instructorIds: [SELF, SAME_REGION] });
-    assert.equal(res.status, 400);
+    assert.equal(res.status, 403);
     assert.equal(classUpdate.mock.callCount(), 0);
   });
 

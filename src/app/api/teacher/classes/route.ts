@@ -39,6 +39,10 @@ export const GET = withRegistry("classes.list", async (session, req, _ctx, _tool
       description: true,
       startDate: true,
       endDate: true,
+      // Region names are readable by every signed-in user (RLS region_read),
+      // so this adds only which region each listed class is in.
+      regionId: true,
+      region: { select: { id: true, name: true } },
       instructors: {
         select: {
           instructor: {
@@ -86,6 +90,8 @@ export const GET = withRegistry("classes.list", async (session, req, _ctx, _tool
   const regions = await listRegionsForClassCreation(session);
 
   return NextResponse.json({
+    viewerRole: session.role,
+    currentInstructorId: session.role === "teacher" ? session.id : null,
     regions,
     classes: classes.map((item) => ({
       ...item,
@@ -99,7 +105,7 @@ export const GET = withRegistry("classes.list", async (session, req, _ctx, _tool
 
 async function assertCoTeachersInRegion(session: Session, regionId: string, instructorIds: string[]) {
   if (!seesWholeState(session.role) && !instructorIds.includes(session.id)) {
-    throw badRequest("Add yourself as an instructor of this classroom.");
+    throw badRequest("Add yourself as an instructor of this class.");
   }
   const others = instructorIds.filter((id) => id !== session.id);
   if (others.length === 0) return;

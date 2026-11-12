@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { listBookableAdvisors, sendAppointmentConfirmation, syncStudentAlerts } from "@/lib/advising";
+import { deferPerStudent } from "@/lib/after-response";
 import { createStudentBooking } from "@/lib/appointment-booking";
 import { logAuditEvent } from "@/lib/audit";
 import { withAuth } from "@/lib/api-error";
@@ -63,7 +64,11 @@ export const POST = withAuth(async (session, req: Request) => {
   const { appointment } = result;
   const logContext = { appointment: appointment.id, student: studentLogKey(session.id) };
 
-  await afterBooking("student alert sync", logContext, () => syncStudentAlerts(session.id));
+  // Queue bookkeeping runs after the response (src/lib/after-response.ts);
+  // afterBooking keeps its failure log carrying the appointment id.
+  deferPerStudent(session.id, { surface: "appointments/book", effect: "syncStudentAlerts" }, () =>
+    afterBooking("student alert sync", logContext, () => syncStudentAlerts(session.id)),
+  );
   await afterBooking("audit log", logContext, () =>
     logAuditEvent({
       actorId: session.id,
@@ -71,7 +76,7 @@ export const POST = withAuth(async (session, req: Request) => {
       action: "appointment.booked",
       targetType: "appointment",
       targetId: appointment.id,
-      summary: `Booked "${appointment.title}" with ${appointment.advisor.displayName}.`,
+      summary: `Booked "${appointment.title}" with an advisor.`,
       metadata: {
         advisorId,
         startsAt: appointment.startsAt.toISOString(),

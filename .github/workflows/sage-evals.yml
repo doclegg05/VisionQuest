@@ -32,6 +32,9 @@ on:
     branches: [main]
     paths:
       - "src/lib/sage/**"
+      - "src/lib/ai/**"
+      - "src/lib/chat/**"
+      - "src/app/api/chat/**"
       - "config/sage-*.json"
       - "scripts/sage-*.mjs"
       - "scripts/lib/**"

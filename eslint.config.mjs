@@ -74,6 +74,26 @@ const restrictedSyntaxEverywhere = [
   },
 ];
 
+// syncStudentAlerts rebuilds the instructor's queue: dozens of RLS-wrapped
+// queries plus a transaction over every alert row the student has. A student
+// waited ~45 s on "Submitting..." for it on 2026-09-07 because a route awaited
+// it, then tapped 13 more times. Student-facing write routes hand it to
+// deferPerStudent (src/lib/after-response.ts) instead. Awaiting a wrapper whose
+// argument calls it (afterWrite, Promise.all) counts too. Staff routes are
+// outside the block; a staff path inside a mixed route awaits it on purpose
+// behind an eslint-disable line that says so.
+const AWAITED_ALERT_SYNC_MESSAGE =
+  "A student's response must not wait on the instructor's alert bookkeeping. Use deferPerStudent(studentId, { surface, effect: \"syncStudentAlerts\" }, () => syncStudentAlerts(studentId)) from @/lib/after-response.";
+const SYNC_CALL = ":matches([callee.name='syncStudentAlerts'], [callee.property.name='syncStudentAlerts'])";
+// A returned promise counts as awaited: the auth wrappers await what a
+// handler returns, so the response waits on it just the same.
+const awaitedAlertSync = [
+  `AwaitExpression > CallExpression${SYNC_CALL}`,
+  `AwaitExpression > CallExpression:has(CallExpression${SYNC_CALL})`,
+  `ReturnStatement > CallExpression${SYNC_CALL}`,
+  `ReturnStatement > CallExpression:has(CallExpression${SYNC_CALL})`,
+].map((selector) => ({ selector, message: AWAITED_ALERT_SYNC_MESSAGE }));
+
 // StudentAlert is the staff intervention queue, and the RLS policy admits a
 // student's own rows, including the wellbeing crisis card (review finding F3,
 // 2026-09-01). Student-facing code reads it only through
@@ -375,6 +395,22 @@ const eslintConfig = defineConfig([
     ],
     rules: {
       "no-restricted-syntax": srcRestrictedSyntax(studentAlertDirectRead, ...openRouterSyntax),
+    },
+  },
+  // Student-facing API routes: the alert sync runs after the response. Comes
+  // after the student-surfaces block, whose entry it repeats and would
+  // otherwise be replaced by.
+  {
+    files: ["src/app/api/**/route.ts"],
+    ignores: [
+      "src/app/api/teacher/**",
+      "src/app/api/internal/**",
+      "src/app/api/admin/**",
+      "src/app/api/coordinator/**",
+      "src/app/api/cron/**",
+    ],
+    rules: {
+      "no-restricted-syntax": srcRestrictedSyntax(studentAlertDirectRead, ...openRouterSyntax, ...awaitedAlertSync),
     },
   },
   // Student files already moved onto theme tokens: no raw palette colors, so

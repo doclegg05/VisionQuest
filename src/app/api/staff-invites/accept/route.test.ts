@@ -68,7 +68,7 @@ const BODY = {
   password: "a-long-enough-password",
 };
 function post(body: unknown = BODY) {
-  return POST(mockRequest("/api/staff-invites/accept", { method: "POST", body, headers: { "x-forwarded-for": "9.9.9.9" } }));
+  return POST(mockRequest("/api/staff-invites/accept", { method: "POST", body, headers: { "x-forwarded-for": `9.9.9.9, 172.70.1.9` } }));
 }
 
 beforeEach(() => {
@@ -123,7 +123,8 @@ describe("POST /api/staff-invites/accept", () => {
     assert.equal(res.status, 200);
     const json = await res.json();
     assert.deepEqual(json, { success: true, data: { role: "teacher", redirectTo: "/teacher" } });
-    assert.deepEqual(cookieCalls[0], ["new1", "teacher", 3]);
+    // The new staff member typed this password, so there is nothing to change.
+    assert.deepEqual(cookieCalls[0], ["new1", "teacher", 3, { mustChangePassword: false }]);
   });
 
   it("answers an expired invite with the plain message and sets no cookie", async () => {

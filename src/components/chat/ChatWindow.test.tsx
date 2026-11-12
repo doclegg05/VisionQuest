@@ -33,6 +33,14 @@ mock.module("react", {
   defaultExport: { ...React, useEffect: runEffectNow },
 });
 
+// next/link runs effects (prefetch) that need the app router; the effect mock
+// above would run them during a server render and fail the whole page. The
+// About Sage test reads the source to prove the real component is Link.
+mock.module("next/link", {
+  defaultExport: ({ href, ...rest }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) =>
+    React.createElement("a", { href, ...rest }),
+});
+
 // Imported after the mocks register: a static import is hoisted and would bind
 // the real modules.
 let ChatWindow: typeof import("./ChatWindow").default;
@@ -88,5 +96,84 @@ describe("ChatWindow deep links (F19: prefill, never auto-send)", () => {
     const html = renderAndWait({ prompt: "a".repeat(1_200) }, "student");
 
     assert.equal(inputBoxText(html), "a".repeat(1_000));
+  });
+});
+
+// H6: the chat header links to the Sage notice. The header, not the input
+// area: another task adds an "AI can be wrong" line under the message box.
+describe("ChatWindow link to the Sage notice", () => {
+  it("links the chat header to the notice page", async () => {
+    const { SAGE_NOTICE_PATH, SAGE_NOTICE_LINK_LABEL } = await import("@/lib/about-sage/notice");
+    const html = renderAndWait({}, "student");
+
+    const link = new RegExp(`<a[^>]*href="${SAGE_NOTICE_PATH}"[^>]*>${SAGE_NOTICE_LINK_LABEL}</a>`);
+    assert.match(html, link);
+    const header = html.slice(0, html.indexOf('role="log"'));
+    assert.match(header, link, "the link sits in the header, above the conversation");
+  });
+
+  it("uses body-size text and a client-side Link for it", async () => {
+    const { readFileSync } = await import("node:fs");
+    const html = renderAndWait({}, "student");
+    const anchor = html.match(/<a[^>]*href="\/about-sage"[^>]*>/)?.[0] ?? "";
+    assert.match(anchor, /\btext-sm\b/);
+    assert.doesNotMatch(anchor, /\btext-xs\b/);
+    // renderToString draws Link as a plain <a>, so the source is the only place to tell them apart.
+    const source = readFileSync("src/components/chat/ChatWindow.tsx", "utf8");
+    assert.match(source, /<Link\s+href="\/about-sage"/);
+    assert.doesNotMatch(source, /<a\s+href="\/about-sage"/);
+  });
+});
+
+describe("the conversation log while Sage answers (E1c 8)", () => {
+  it("tells screen readers when the log is busy, so a streamed reply is not read twice", () => {
+    const html = renderToString(<ChatWindow role="student" />);
+    assert.match(html, /role="log"[^>]*aria-busy="false"/);
+  });
+});
+
+describe("ChatWindow wires the wait and Stop pieces (E2)", () => {
+  // renderToString cannot press Send, so the source is checked for the wiring;
+  // the behavior itself is tested in wait-and-stop.test.ts, TypingIndicator
+  // and ChatInput.
+  it("passes Stop, the wait words, the abort signal and the opener rule", async () => {
+    const { readFileSync } = await import("node:fs");
+    const source = readFileSync("src/components/chat/ChatWindow.tsx", "utf8");
+    assert.match(source, /onStop=\{stopReply\}/);
+    assert.match(source, /<TypingIndicator slow=\{slowReply\} stalled=\{stalledReply\} \/>/);
+    assert.match(source, /signal: controller\.signal/);
+    assert.match(source, /showsCannedOpener\(\{ role, isFirstMessage, localProvider \}\)/);
+    assert.match(source, /readChatStream\(res, turn\.handlers\)/);
+  });
+
+  it("arms Stop from the first event's ids and marks the log busy only while words stream (E2b 1 to 3)", async () => {
+    const { readFileSync } = await import("node:fs");
+    const source = readFileSync("src/components/chat/ChatWindow.tsx", "utf8");
+    assert.match(source, /stopArmed=\{stopIsArmed\}/);
+    // The recorder calls it from onIds, after the ids are noted (turn-recorder.test.ts).
+    assert.match(source, /noteIds: sendAbort\.noteIds/);
+    assert.match(source, /aria-busy=\{logBusy\(isLoading, streamingContent\)\}/);
+  });
+
+  it("says why leaving the page does not abort the reply (E2b 9)", async () => {
+    const { readFileSync } = await import("node:fs");
+    const source = readFileSync("src/components/chat/ChatWindow.tsx", "utf8");
+    assert.match(source, /deliberately does not abort/);
+  });
+
+  it("keeps handleSend under 50 lines and the file under 700 (E2b 7)", async () => {
+    const { readFileSync } = await import("node:fs");
+    const source = readFileSync("src/components/chat/ChatWindow.tsx", "utf8");
+    const lines = source.split("\n");
+    assert.ok(lines.length < 700, String(lines.length));
+    const start = lines.findIndex((line) => /const handleSend = useCallback\(/.test(line));
+    const end = lines.findIndex((line, i) => i > start && /^  \);$/.test(line));
+    assert.ok(start >= 0 && end > start, "handleSend not found");
+    assert.ok(end - start + 1 <= 50, `handleSend is ${end - start + 1} lines`);
+  });
+
+  it("renders with the local provider flag", () => {
+    const html = renderToString(<ChatWindow role="student" localProvider />);
+    assert.match(html, /role="log"/);
   });
 });

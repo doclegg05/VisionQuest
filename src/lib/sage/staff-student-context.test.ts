@@ -48,6 +48,13 @@ function studentRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
+interface AuditRow {
+  action: string;
+  actorId: string | null;
+  targetId: string | null;
+}
+const auditRows: AuditRow[] = [];
+
 const state = {
   student: studentRow() as Record<string, unknown> | null,
   candidates: [] as Array<Record<string, unknown>>,
@@ -62,6 +69,19 @@ mock.module("@/lib/db", {
       },
       orientationItem: { findMany: async () => [] },
       orientationProgress: { findMany: async () => [] },
+    },
+    // The real recordStudentView writes through the admin client.
+    prismaAdmin: {
+      auditLog: {
+        findFirst: async (args: { where: { actorId: string; action: string; targetId: string } }) =>
+          auditRows.find(
+            (row) => row.actorId === args.where.actorId && row.action === args.where.action && row.targetId === args.where.targetId,
+          ) ?? null,
+        create: async (args: { data: AuditRow }) => {
+          auditRows.push(args.data);
+          return { id: `audit-${auditRows.length}` };
+        },
+      },
     },
   },
 });
@@ -254,5 +274,49 @@ describe("buildStaffStudentContext: no login id in the ambiguous-name branch", (
     assert.equal(result.resolution, "resolved");
     assert.equal(result.targetStudentId, "stu1");
     assert.ok(!result.context?.includes(LOGIN_ID));
+  });
+});
+
+// ── Staff Sage chat reads are audited (H15b item 3) ─────────────────────────
+
+describe("buildStaffStudentContext records a sage_chat view", () => {
+  const sageChatRows = () => auditRows.filter((row) => row.action === "teacher.student.view.sage_chat");
+
+  it("for a student picked by id", async () => {
+    auditRows.length = 0;
+    state.student = studentRow();
+    await buildStaffStudentContext(teacherSession, { userMessage: "/student Karissa Johnson", targetStudentId: "stu1" });
+
+    assert.deepEqual(sageChatRows(), [
+      { actorId: "t1", actorRole: "teacher", action: "teacher.student.view.sage_chat", targetType: "student", targetId: "stu1", summary: "Viewed student data (sage_chat).", metadata: JSON.stringify({ surface: "sage_chat" }) },
+    ]);
+  });
+
+  it("for a student named in the message", async () => {
+    auditRows.length = 0;
+    state.candidates = [{ id: "stu1", displayName: "Karissa Johnson", studentId: LOGIN_ID, createdAt: new Date("2026-03-14T12:00:00.000Z") }];
+    state.student = studentRow();
+    const result = await buildStaffStudentContext(teacherSession, { userMessage: "How is Karissa Johnson doing?" });
+
+    assert.equal(result.resolution, "resolved");
+    assert.deepEqual(sageChatRows().map((row) => row.targetId), ["stu1"]);
+  });
+
+  it("not when the name is ambiguous", async () => {
+    auditRows.length = 0;
+    state.candidates = [
+      { id: "s1", displayName: "Karissa Johnson", studentId: LOGIN_ID_ONE, createdAt: new Date("2026-03-14T12:00:00.000Z") },
+      { id: "s2", displayName: "Karissa Smith", studentId: LOGIN_ID_TWO, createdAt: new Date("2026-08-02T12:00:00.000Z") },
+    ];
+    await buildStaffStudentContext(teacherSession, { userMessage: "Can you check Karissa's progress?" });
+    assert.equal(sageChatRows().length, 0);
+  });
+
+  it("not when the record is not found", async () => {
+    auditRows.length = 0;
+    state.student = null;
+    const result = await buildStaffStudentContext(teacherSession, { userMessage: "x", targetStudentId: "stu1" });
+    assert.equal(result.resolution, "not_found");
+    assert.equal(sageChatRows().length, 0);
   });
 });

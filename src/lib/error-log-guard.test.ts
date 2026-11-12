@@ -106,6 +106,14 @@ describe("error-log guard: forms", () => {
   }
 });
 
+const SYNC_PRELUDE = [
+  "declare function syncStudentAlerts(id: string): Promise<void>;",
+  "declare function afterWrite(effect: () => unknown, context: object): Promise<void>;",
+  "declare function deferPerStudent(id: string, context: object, effect: () => Promise<unknown>): void;",
+  "declare const advising: { syncStudentAlerts: (id: string) => Promise<void> };",
+  "",
+].join("\n");
+
 // One probe per selector group. Each must fire at every path listed for it.
 const GROUP_PROBES = {
   rawErrorText: inCatch("err", 'logger.error("x", { error: String(err) });'),
@@ -113,6 +121,7 @@ const GROUP_PROBES = {
   openRouterDynamicImport: 'export async function probe() {\n  return import("@/lib/ai/openrouter-provider");\n}\n',
   studentAlertDirectRead: "export const probe = (db: { studentAlert: unknown }) => db.studentAlert;\n",
   rawPalette: 'export const probe = "rounded bg-red-500 p-2";\n',
+  awaitedAlertSync: `${SYNC_PRELUDE}export async function probe() {\n  await syncStudentAlerts("stu");\n}\n`,
 } as const;
 
 type Group = keyof typeof GROUP_PROBES;
@@ -124,7 +133,7 @@ const EXPECTED_GROUPS: Record<string, Group[]> = {
   [INTERNAL_ROUTE]: APP_CODE,
   "src/app/api/cron/probe/route.ts": APP_CODE,
   "src/lib/probe.ts": APP_CODE,
-  "src/app/api/probe/route.ts": [...APP_CODE, "studentAlertDirectRead"],
+  "src/app/api/probe/route.ts": [...APP_CODE, "studentAlertDirectRead", "awaitedAlertSync"],
   "src/app/(student)/probe/page.tsx": [...APP_CODE, "studentAlertDirectRead"],
   "src/lib/progression/probe.ts": [...APP_CODE, "studentAlertDirectRead"],
   "src/components/teacher/Probe.tsx": [...APP_CODE, "rawPalette"],
@@ -144,5 +153,53 @@ describe("error-log guard: every no-restricted-syntax block keeps every group", 
         );
       });
     }
+  }
+});
+
+// A student-facing write route must not await the alert sync: one student
+// waited ~45 s on "Submitting..." for it (prod, 2026-09-07). Staff routes
+// await it on purpose, so the instructor's queue is fresh on the next fetch.
+async function awaitedSyncCount(code: string, filePath: string): Promise<number> {
+  const [result] = await eslint.lintText(code, { filePath });
+  return result.messages.filter(
+    (message) => message.ruleId === "no-restricted-syntax" && message.message.includes("deferPerStudent"),
+  ).length;
+}
+
+const STUDENT_ROUTE = "src/app/api/probe/route.ts";
+const SYNC_REJECTED: Record<string, string> = {
+  "awaiting the sync": GROUP_PROBES.awaitedAlertSync,
+  "awaiting a member call to the sync": `${SYNC_PRELUDE}export async function probe() {\n  await advising.syncStudentAlerts("stu");\n}\n`,
+  "awaiting a wrapper whose argument calls it": `${SYNC_PRELUDE}export async function probe() {\n  await afterWrite(() => syncStudentAlerts("stu"), {});\n}\n`,
+  "awaiting Promise.all over it": `${SYNC_PRELUDE}export async function probe() {\n  await Promise.all([syncStudentAlerts("stu")]);\n}\n`,
+  // withAuth awaits what a handler returns, so returning the promise waits too.
+  "returning the sync": `${SYNC_PRELUDE}export async function probe() {\n  return syncStudentAlerts("stu");\n}\n`,
+  "returning a wrapper whose argument calls it": `${SYNC_PRELUDE}export async function probe() {\n  return afterWrite(() => syncStudentAlerts("stu"), {});\n}\n`,
+};
+const SYNC_ALLOWED: Record<string, string> = {
+  "deferPerStudent": `${SYNC_PRELUDE}export function probe() {\n  deferPerStudent("stu", {}, () => syncStudentAlerts("stu"));\n}\n`,
+};
+
+describe("awaited alert sync guard", () => {
+  for (const [form, code] of Object.entries(SYNC_REJECTED)) {
+    it(`rejects ${form} in a student-facing route`, async () => {
+      assert.ok((await awaitedSyncCount(code, STUDENT_ROUTE)) > 0, `the rule let ${form} through`);
+    });
+  }
+
+  for (const [form, code] of Object.entries(SYNC_ALLOWED)) {
+    it(`allows ${form} in a student-facing route`, async () => {
+      assert.equal(await awaitedSyncCount(code, STUDENT_ROUTE), 0);
+    });
+  }
+
+  for (const path of [
+    "src/app/api/teacher/probe/route.ts",
+    "src/app/api/internal/probe/route.ts",
+    "src/lib/probe.ts",
+  ]) {
+    it(`leaves ${path} free to await the sync`, async () => {
+      assert.equal(await awaitedSyncCount(SYNC_REJECTED["awaiting the sync"], path), 0);
+    });
   }
 });

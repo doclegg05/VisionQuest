@@ -1,0 +1,25 @@
+{
+  "id": "E9",
+  "kind": "task",
+  "set": "launch",
+  "title": "Chat never traps a student waiting",
+  "doneWhen": "Route test: the first stream event arrives before context assembly; a stalled turn ends with a Try again within the bound; a client abort cancels the provider call.",
+  "check": {
+    "type": "test",
+    "files": [
+      "src/app/api/chat/send/__tests__/route.early-event.test.ts",
+      "src/app/api/chat/send/__tests__/route.failure.test.ts",
+      "src/lib/ai/__tests__/provider-abort.test.ts",
+      "src/components/chat/reply-bounds.test.ts",
+      "src/components/chat/TypingIndicator.test.tsx",
+      "src/lib/readiness/chat-send-query-count.test.ts",
+      "src/components/chat/send-timeout.test.ts",
+      "src/components/chat/send-request.retry.test.ts",
+      "src/lib/sage/crisis-patterns.test.ts",
+      "src/lib/ai/__tests__/abort.test.ts",
+      "src/lib/ai/__tests__/embedding-abort.test.ts",
+      "src/lib/sage/agent/loop.abort-log.test.ts",
+      "src/lib/chat/retry-turn.test.ts"
+    ]
+  }
+}

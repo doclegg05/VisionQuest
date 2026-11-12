@@ -44,6 +44,19 @@ describe("SettingsView role split", () => {
     assert.ok(student.includes("files you hand to Sage in chat"));
   });
 
+  it("shows the Change Your Password section to students only", () => {
+    // POST /api/settings/password refuses every role but student, so the
+    // form would promise staff a save that answers 403.
+    const student = renderToString(<SettingsView initialRole="student" />);
+    assert.ok(student.includes("Change Your Password"));
+    assert.ok(student.includes('id="settings-password-new"'));
+
+    for (const role of ["teacher", "admin", "coordinator"]) {
+      const staff = renderToString(<SettingsView initialRole={role} />);
+      assert.ok(!staff.includes("Change Your Password"), role);
+    }
+  });
+
   it("shows the Work availability form to students only", () => {
     // Staff have no work profile of their own — /api/work-profile refuses
     // them — so rendering the form for staff would promise a save that 403s.
@@ -95,5 +108,26 @@ describe("the Text Messages switch", () => {
       smsToggleDisabled({ isStudentSurface: false, smsEnabled: false, smsConsented: false }),
       false,
     );
+  });
+});
+
+describe("SettingsView personal AI key section (owner decision R9)", () => {
+  const KEY_TEXT = /API Key|API key|Gemini|aistudio|AIza/;
+
+  it("never shows a student how to add or manage an AI key", () => {
+    // `null` is the student route before the session fetch resolves.
+    for (const role of ["student", null]) {
+      const html = renderToString(<SettingsView initialRole={role} />);
+      assert.doesNotMatch(html, KEY_TEXT, String(role));
+      assert.ok(!html.includes('id="api-key"'), String(role));
+    }
+  });
+
+  it("keeps the key section for staff and admins", () => {
+    for (const role of ["teacher", "admin", "coordinator"]) {
+      const html = renderToString(<SettingsView initialRole={role} />);
+      assert.ok(html.includes("How to Get Your API Key"), role);
+      assert.ok(html.includes('id="api-key"'), role);
+    }
   });
 });

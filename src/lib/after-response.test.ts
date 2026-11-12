@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { before, beforeEach, describe, it, mock } from "node:test";
+import { studentLogKey } from "./log-keys";
 import { getRlsContext, withRlsContext } from "./rls-context";
 
 // Pinning four things about `deferAfterResponse`:
@@ -35,12 +36,14 @@ mock.module("./logger", {
 
 // Late import — must come after the mock.module calls.
 let deferAfterResponse: typeof import("./after-response").deferAfterResponse;
+let deferPerStudent: typeof import("./after-response").deferPerStudent;
+let DEFERRED_EFFECT_CONCURRENCY: number;
 
 const ACTOR = { userId: "student-a", role: "student", studentId: "student-a" };
 
 describe("deferAfterResponse", () => {
   before(async () => {
-    ({ deferAfterResponse } = await import("./after-response"));
+    ({ deferAfterResponse, deferPerStudent, DEFERRED_EFFECT_CONCURRENCY } = await import("./after-response"));
   });
 
   beforeEach(() => {
@@ -120,3 +123,121 @@ describe("deferAfterResponse", () => {
     assert.doesNotThrow(() => deferAfterResponse(async () => undefined));
   });
 });
+
+// deferPerStudent: the route-facing helper. It defers like deferAfterResponse
+// and routes each student's effect through one-running-one-queued, so taps
+// on Submit do not each start a sync of the same alert rows.
+describe("deferPerStudent", () => {
+  const CONTEXT = { surface: "probe", effect: "syncStudentAlerts" };
+
+  beforeEach(() => {
+    mockAfter.mock.resetCalls();
+    mockLogError.mock.resetCalls();
+    mockAfter.mock.mockImplementation(() => undefined);
+  });
+
+  async function runScheduled(): Promise<void> {
+    await Promise.all(mockAfter.mock.calls.map((call) => call.arguments[0]()));
+  }
+
+  it("does not run the effect before the response", () => {
+    let ran = false;
+    deferPerStudent("student-a", CONTEXT, async () => {
+      ran = true;
+    });
+    assert.equal(mockAfter.mock.callCount(), 1);
+    assert.equal(ran, false);
+  });
+
+  it("runs at most one effect at a time per student, and one more after it", async () => {
+    let runs = 0;
+    let active = 0;
+    let peak = 0;
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const effect = async () => {
+      runs += 1;
+      active += 1;
+      peak = Math.max(peak, active);
+      await held;
+      active -= 1;
+    };
+
+    for (let i = 0; i < 5; i += 1) deferPerStudent("student-a", CONTEXT, effect);
+    const all = runScheduled();
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(runs, 1, "a second sync for the same student started alongside the first");
+    release();
+    await all;
+    assert.equal(runs, 2);
+    assert.equal(peak, 1);
+  });
+
+  // Database review of F3: 30 students signing at once must not start 30
+  // syncs against a pool of 5.
+  it("runs no more than the cap of deferred effects at once across students", async () => {
+    let runs = 0;
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const effect = async () => {
+      runs += 1;
+      await held;
+    };
+
+    for (let i = 0; i < 6; i += 1) deferPerStudent(`cap-student-${i}`, CONTEXT, effect);
+    const all = runScheduled();
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(runs, DEFERRED_EFFECT_CONCURRENCY, "more deferred effects ran at once than the cap allows");
+    release();
+    await all;
+    assert.equal(runs, 6, "every student still got their sync");
+  });
+
+  it("keeps each queued effect on the actor that scheduled it", async () => {
+    const seen: Array<ReturnType<typeof getRlsContext>> = [];
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const second = { ...ACTOR, userId: "student-a-second-request" };
+
+    withRlsContext(ACTOR, () =>
+      deferPerStudent("student-a", CONTEXT, async () => {
+        seen.push(getRlsContext());
+        await held;
+      }),
+    );
+    withRlsContext(second, () =>
+      deferPerStudent("student-a", CONTEXT, async () => {
+        seen.push(getRlsContext());
+      }),
+    );
+    const all = runScheduled();
+    release();
+    await all;
+    assert.deepEqual(seen, [ACTOR, second]);
+  });
+
+  it("logs a failed effect with the surface and a student key, never the id", async () => {
+    const mockWarn = mock.method(
+      (await import("./logger")).logger,
+      "warn",
+      () => undefined,
+    );
+    deferPerStudent("student-a", CONTEXT, async () => {
+      throw new Error("Unique constraint failed on student-a");
+    });
+    await runScheduled();
+    assert.equal(mockWarn.mock.callCount(), 1);
+    const payload = mockWarn.mock.calls[0].arguments[1] as Record<string, unknown>;
+    assert.equal(payload.surface, "probe");
+    assert.equal(payload.student, studentLogKey("student-a"));
+    assert.ok(!JSON.stringify(mockWarn.mock.calls[0].arguments).includes("student-a"), "the log line carries the id");
+    mockWarn.mock.restore();
+  });
+});
+

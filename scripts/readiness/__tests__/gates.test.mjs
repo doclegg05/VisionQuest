@@ -20,7 +20,8 @@ const seed = () => import("../seed-gates.mjs");
 
 /** Plan targets. A gate may tighten its target and may never loosen it. */
 const METRICS = {
-  M1: { target: 85, set: "launch" }, // estimated round trips; see the plan's Metrics section
+  // Targets do not move when the instrument is corrected.
+  M1: { target: 85, set: "launch" },
   M2: { target: 8, set: "launch" },
   M3: { target: 12, set: "pilot" },
   M4: { target: 235, set: "launch" },
@@ -37,11 +38,20 @@ async function realGates(kind) {
 
 // --- the committed gate files ---
 
-test("the plan's task tables parse to 34 launch, 26 pilot and 1 hold task", async () => {
+test("the plan's task tables parse to 40 launch, 35 pilot and 1 hold task", async () => {
   const { readPlanTasks } = await seed();
   const counts = { launch: 0, pilot: 0, hold: 0 };
   for (const task of readPlanTasks(readFileSync(join(ROOT, PLAN), "utf8"))) counts[task.set] += 1;
-  assert.deepEqual(counts, { launch: 34, pilot: 26, hold: 1 });
+  assert.deepEqual(counts, { launch: 40, pilot: 35, hold: 1 });
+});
+
+// A new row once reused an id that another task already had (F6, 2026-11-10).
+// The gate file already existed, so nothing else noticed.
+test("no two tasks in the plan share an id", async () => {
+  const { readPlanTasks } = await seed();
+  const ids = readPlanTasks(readFileSync(join(ROOT, PLAN), "utf8")).map((task) => task.id);
+  const repeated = ids.filter((id, index) => ids.indexOf(id) !== index);
+  assert.deepEqual(repeated, []);
 });
 
 test("every task in the plan has a gate file with the plan's set, and no gate lacks a task", async () => {
@@ -61,17 +71,24 @@ test("the eight metric gates keep the plan's sets and never loosen a target", as
   }
 });
 
+test("the round-trip gates say what their target stands for", async () => {
+  const gates = (await realGates("metric")).filter((gate) => ["M1", "M3", "M6"].includes(gate.id));
+  assert.equal(gates.length, 3);
+  for (const gate of gates) assert.ok(typeof gate.basis === "string" && gate.basis.trim() !== "", `${gate.id} needs a "basis"`);
+});
+
 test("the owner gates are O-1 to O-12", async () => {
   const ids = (await realGates("owner")).map((gate) => gate.id);
   assert.deepEqual(ids, Array.from({ length: 12 }, (_, index) => `O-${index + 1}`));
 });
 
-test("every owner check, task E0 included, names rows that the ops evidence checklist has", async () => {
+test("every owner check, including E0 and H8, names rows that the ops evidence checklist has", async () => {
   const { parseChecklist } = await import("../parse.mjs");
   const { loadGates } = await scorecard();
   const rows = parseChecklist(readFileSync(join(ROOT, CHECKLIST), "utf8"));
   const ownerChecked = loadGates(ROOT).filter((gate) => gate.check.type === "owner");
-  assert.equal(ownerChecked.length, 13);
+  assert.equal(ownerChecked.length, 14);
+  assert.ok(ownerChecked.some((gate) => gate.id === "H8"), "the incident runbook requires owner approval");
   for (const gate of ownerChecked) {
     assert.equal(gate.check.doc, CHECKLIST, `${gate.id} doc`);
     for (const row of gate.check.rows) assert.ok(rows.has(row), `${gate.id} names a row the checklist lacks: ${row}`);

@@ -18,7 +18,7 @@ let failSync = false;
 let auditOk = true;
 let lastListArgs: unknown;
 const audit = mock.fn(async (_input?: unknown) => ({ audited: auditOk }));
-const sync = mock.fn(async () => { if (failSync) throw new Error("sync unavailable"); });
+const sync = mock.fn(async (_studentId: string) => { if (failSync) throw new Error("sync unavailable"); });
 const tx = {
   student: { findFirst: mock.fn(async () => staffAllowed ? { id: session.id } : null) },
   appointment: { findFirst: async () => null },
@@ -142,10 +142,37 @@ describe("owned task mutations", () => {
     const reopened = await service.updateTasks(session, [{ id: id1, patch: { status: "open" } }]);
     assert.equal(reopened.tasks[0].completedAt, null);
   });
+  // The alert sync is awaited only on staff paths now (a student's save does
+  // not wait on it, see below), so the alertsSynced=false report is a staff one.
   it("reports post-commit audit and alert failures without lying about saved work", async () => {
     auditOk = false; failSync = true;
-    const result = await service.updateTasks(session, [{ id: id1, patch: { status: "completed" } }]);
+    const staff: Session = { ...session, id: "teacher-1", role: "teacher" };
+    const result = await service.updateTasks(staff, [{ id: id1, patch: { status: "completed" } }]);
     assert.equal(result.audited, false); assert.equal(result.alertsSynced, false); assert.equal(rows[0].status, "completed");
+  });
+  // Prod, 2026-09-07: a student's save held on the alert sync for ~45 s.
+  it("answers a student's save without waiting for the alert sync, and still starts it", async () => {
+    let release: () => void = () => undefined;
+    sync.mock.mockImplementation(() => new Promise<void>((resolve) => { release = resolve; }));
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<"timed out">((resolve) => { timer = setTimeout(() => resolve("timed out"), 2000); });
+    const outcome = await Promise.race([service.updateTasks(session, [{ id: id1, patch: { status: "completed" } }]), timeout]);
+    clearTimeout(timer); release(); await new Promise((resolve) => setImmediate(resolve));
+    sync.mock.mockImplementation(async (_studentId: string) => { if (failSync) throw new Error("sync unavailable"); });
+    if (outcome === "timed out") assert.fail("the student's save waited on the alert sync");
+    assert.deepEqual(sync.mock.calls[0].arguments, [session.id]);
+    assert.equal(outcome.alertsSynced, undefined, "a deferred sync has no result to report yet");
+  });
+  it("keeps a staff save waiting for the alert sync, so the instructor's queue is fresh", async () => {
+    let release: () => void = () => undefined;
+    sync.mock.mockImplementation(() => new Promise<void>((resolve) => { release = resolve; }));
+    const work = service.updateTasks({ ...session, id: "teacher-1", role: "teacher" }, [{ id: id1, patch: { status: "completed" } }]);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const pending = new Promise<"pending">((resolve) => { timer = setTimeout(() => resolve("pending"), 200); });
+    assert.equal(await Promise.race([work, pending]), "pending", "a staff save must await the sync");
+    clearTimeout(timer); release();
+    assert.equal((await work).alertsSynced, true);
+    sync.mock.mockImplementation(async (_studentId: string) => { if (failSync) throw new Error("sync unavailable"); });
   });
   it("deletes only personal tasks with a matching version", async () => {
     await assert.rejects(service.deletePersonalTask(session, id1, "2025-01-01T00:00:00.000Z"), /changed/);

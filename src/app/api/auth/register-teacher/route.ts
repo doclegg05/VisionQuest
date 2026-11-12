@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { prismaAdmin as prisma } from "@/lib/db";
 import { hashPassword, normalizeEmail, normalizeStudentId, setSessionCookie } from "@/lib/auth";
-import { clientIpBucket } from "@/lib/client-ip";
+import { clientIpAddress, clientIpBucket } from "@/lib/client-ip";
 import { rateLimit } from "@/lib/rate-limit";
 import { logAuditEvent } from "@/lib/audit";
 import { withErrorHandler } from "@/lib/api-error";
@@ -83,8 +83,8 @@ function tooManyAttempts(): NextResponse {
 }
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const ip = clientIpBucket(req);
-  const rl = await rateLimit(`register-staff:${ip}`, 5, 15 * 60 * 1000);
+  const ip = clientIpAddress(req);
+  const rl = await rateLimit(`register-staff:${clientIpBucket(req)}`, 5, 15 * 60 * 1000);
   if (!rl.success) {
     return tooManyAttempts();
   }
@@ -217,12 +217,13 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     return NextResponse.json({ error: "That ID is already taken. Please use a different email." }, { status: 409 });
   }
 
-  const { hash } = hashPassword(password);
+  const { hash } = await hashPassword(password);
   const account = await prisma.student.create({
     data: { studentId, displayName, passwordHash: hash, email, role },
   });
 
-  await setSessionCookie(account.id, account.role, account.sessionVersion);
+  // The new staff member typed this password just now, so nobody else knows it.
+  await setSessionCookie(account.id, account.role, account.sessionVersion, { mustChangePassword: false });
 
   await logAuditEvent({
     actorId: account.id,

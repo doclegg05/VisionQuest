@@ -58,7 +58,7 @@ export const POST = withTeacherAuth(async (session, req: NextRequest) => {
       action: "mfa.setup_verify_failed",
       targetType: "student",
       targetId: student.id,
-      summary: `MFA setup verification failed for ${student.studentId} — invalid token.`,
+      summary: `MFA setup verification failed: invalid token.`,
     });
 
     return NextResponse.json({ error: "Invalid token. Please try again." }, { status: 401 });
@@ -87,7 +87,7 @@ export const POST = withTeacherAuth(async (session, req: NextRequest) => {
     action: "mfa.enabled",
     targetType: "student",
     targetId: student.id,
-    summary: `MFA enabled for ${student.studentId}.`,
+    summary: `MFA enabled.`,
   });
 
   return NextResponse.json({

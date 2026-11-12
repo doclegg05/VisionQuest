@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { syncStudentAlerts } from "@/lib/advising";
 import { withTeacherAuth } from "@/lib/api-error";
-import { logAuditEvent } from "@/lib/audit";
+import { logAuditEvent, recordStudentView } from "@/lib/audit";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import {
@@ -140,6 +140,13 @@ export const GET = withTeacherAuth(async (
     activeClassIds: activeEnrollments.map((enrollment) => enrollment.classId),
     applications: placementApplications,
     spokesRecord: hydratedRecord,
+  });
+
+  await recordStudentView({
+    actorId: session.id,
+    actorRole: session.role,
+    targetStudentId: id,
+    surface: "spokes",
   });
 
   return NextResponse.json({
@@ -345,7 +352,7 @@ export const PUT = withTeacherAuth(async (
     action: "teacher.spokes.record.update",
     targetType: "spokes_record",
     targetId: record.id,
-    summary: `Updated SPOKES record for ${record.firstName} ${record.lastName}.`,
+    summary: `Updated a SPOKES record.`,
     metadata: {
       studentId: id,
       status: record.status,

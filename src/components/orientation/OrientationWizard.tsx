@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useId } from "react";
 import { useProgression } from "@/components/progression/ProgressionProvider";
 import { getOrientationStepDetail } from "@/lib/orientation-step-resources";
 import {
@@ -14,7 +14,7 @@ import WizardStepIndicator from "./WizardStepIndicator";
 import WizardCompletion from "./WizardCompletion";
 import { WELCOME_VIDEO_ORIENTATION_ITEM_ID } from "@/lib/orientation-welcome-video";
 
-interface OrientationItem {
+export interface OrientationItem {
   id: string;
   label: string;
   description: string | null;
@@ -48,11 +48,30 @@ function classifyStep(form: SpokesForm): StepType {
   return "read-only";
 }
 
-async function fetchOrientationWizardItems(): Promise<OrientationItem[]> {
-  const res = await fetch("/api/orientation");
+async function requestOrientationItems(fetchFn: typeof fetch): Promise<OrientationItem[]> {
+  const res = await fetchFn("/api/orientation");
   if (!res.ok) throw new Error("Failed to load");
   const data = await res.json();
   return data.items || [];
+}
+
+// The orientation page mounts the wizard and the welcome video together and
+// both need this list. Callers that ask while a request is still running share
+// it; once it settles the slot clears, so a later call (a retry, a refresh)
+// always reads fresh data.
+let inFlightItems: Promise<OrientationItem[]> | null = null;
+
+export function fetchOrientationWizardItems(
+  fetchFn: typeof fetch = fetch
+): Promise<OrientationItem[]> {
+  if (inFlightItems) return inFlightItems;
+  const request = requestOrientationItems(fetchFn);
+  inFlightItems = request;
+  const release = () => {
+    if (inFlightItems === request) inFlightItems = null;
+  };
+  request.then(release, release);
+  return request;
 }
 
 /**
@@ -118,6 +137,139 @@ function deriveSteps(items: OrientationItem[]): WizardStep[] {
   return steps;
 }
 
+/** Style for the numbered "1. / 2. / 3." lines that say the steps in order. */
+const STEP_LEAD_CLASS = "text-sm font-semibold text-[var(--ink-strong)]";
+
+interface DocumentOpenState {
+  hasRead: boolean;
+  /** Whether the student pressed "Open the document" during this visit. */
+  openedDocument: boolean;
+}
+
+/**
+ * The gentle "you have not opened it yet" nudge. Not a block: some students
+ * read a paper copy in class, so ticking the box still lets them sign.
+ */
+export function shouldPromptToOpenDocument({ hasRead, openedDocument }: DocumentOpenState): boolean {
+  return hasRead && !openedDocument;
+}
+
+/**
+ * What a document step asks for after the reading: a signature, a ticked box,
+ * or nothing. The pane and the nudge are shared by all three, so their words
+ * must not promise a signature the step never asks for.
+ */
+type DocumentStepKind = "sign" | "acknowledge" | "read-only";
+
+interface OrientationDocumentPaneProps {
+  /** Address of the document, from `buildFormDownloadUrl(form, "view")`. */
+  url: string;
+  title: string;
+  kind: DocumentStepKind;
+  /** The instructor sent this form back to be done again. */
+  needsRedo?: boolean;
+  /** Called when the student presses the link, so the wizard can stop nudging. */
+  onOpen: () => void;
+}
+
+/**
+ * The document a student reads before they tick "I opened and read this document".
+ *
+ * Phones usually show an embedded PDF as its first page or not at all, so the
+ * link is always there and the frame appears only from the `md` breakpoint up.
+ * Both are plain CSS (no script reads the screen size), which keeps the page
+ * right before JavaScript runs.
+ */
+export function OrientationDocumentPane({ url, title, kind, needsRedo = false, onOpen }: OrientationDocumentPaneProps) {
+  const helperId = useId();
+  // A read-only step is this one action, so it gets no number.
+  const lead = kind === "read-only" ? "Open and read the document." : "1. Open and read the document.";
+  const comeBack = kind === "sign" ? "Then come back to this page to sign." : "Then come back to this page.";
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-col items-start gap-2 rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] p-4">
+        <p className={STEP_LEAD_CLASS}>{lead}</p>
+        {needsRedo && (
+          <p className="rounded-lg bg-warning-soft px-3 py-1.5 text-xs text-warning">
+            Your instructor asked you to do this form again.
+          </p>
+        )}
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={onOpen}
+          aria-describedby={helperId}
+          className="inline-flex min-h-11 items-center justify-center rounded-lg bg-info px-4 py-2 text-sm font-semibold text-on-info hover:bg-brand-dark"
+        >
+          Open the document<span className="sr-only">{`: ${title}`}</span>
+        </a>
+        <p id={helperId} className="text-sm text-[var(--ink-muted)]">
+          {`It opens on a new page. Read all of it. ${comeBack} If it downloads instead, open it from your downloads.`}
+        </p>
+        <p className="hidden text-sm text-[var(--ink-muted)] md:block">You can also read it below.</p>
+      </div>
+      {/* Lazy: hiding the frame below md does not stop a phone fetching the PDF; a lazy frame that is never laid out is not fetched. */}
+      <iframe
+        src={url}
+        title={title}
+        loading="lazy"
+        className="hidden h-[500px] w-full rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] md:block"
+      />
+    </div>
+  );
+}
+
+interface DocumentReadCheckboxProps {
+  checked: boolean;
+  openedDocument: boolean;
+  kind: "sign" | "acknowledge";
+  onChange: (checked: boolean) => void;
+}
+
+/**
+ * Step 2 of a document step. The status line is always in the page so screen
+ * readers hear the nudge when it appears; it shows only below `md`, where the
+ * frame is hidden and the link is the only way to see the document.
+ */
+export function DocumentReadCheckbox({ checked, openedDocument, kind, onChange }: DocumentReadCheckboxProps) {
+  const prompt = shouldPromptToOpenDocument({ hasRead: checked, openedDocument });
+  const before = kind === "sign" ? "before you sign" : "before you go on";
+  return (
+    <div className="space-y-2">
+      <p className={STEP_LEAD_CLASS}>2. Tick the box.</p>
+      <label className="flex min-h-11 cursor-pointer items-center gap-3">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+          className="h-6 w-6 shrink-0 rounded border-[var(--border-strong)] text-success focus:ring-success"
+        />
+        <span className="text-sm text-[var(--ink-strong)]">I opened and read this document</span>
+      </label>
+      <p role="status" className="text-sm text-[var(--ink-strong)] md:hidden">
+        {prompt ? `You have not opened the document yet. Tap Open the document and read it ${before}.` : ""}
+      </p>
+    </div>
+  );
+}
+
+interface SignStartButtonProps {
+  onClick: () => void;
+}
+
+/** Step 3 of a sign step: opens the signature pad. */
+export function SignStartButton({ onClick }: SignStartButtonProps) {
+  return (
+    <div className="space-y-2">
+      <p className={STEP_LEAD_CLASS}>3. Sign.</p>
+      <button type="button" onClick={onClick} className="primary-button min-h-11 px-6 py-2.5 text-sm">
+        Sign & Continue →
+      </button>
+    </div>
+  );
+}
+
 interface CompletedForm {
   title: string;
   type: "signed" | "acknowledged" | "read";
@@ -131,6 +283,9 @@ export default function OrientationWizard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasRead, setHasRead] = useState(false);
+  // Whether "Open the document" was pressed for the current step, this visit
+  // only. Drives the gentle nudge; nothing is stored or sent.
+  const [openedDocument, setOpenedDocument] = useState(false);
   const [showSignature, setShowSignature] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [completed, setCompleted] = useState(false);
@@ -281,12 +436,12 @@ export default function OrientationWizard() {
       });
       if (!signRes.ok) {
         const data = await signRes.json().catch(() => ({}));
-        setError(data.error || "Signature submission failed.");
+        setError(data.error || "We couldn't save your signature. Please try again.");
         return;
       }
       await finishStep(step, { title: step.stepTitle, type: "signed" });
     } catch {
-      setError("Submission failed. Please try again.");
+      setError("We couldn't save your signature. Please try again.");
     } finally {
       signInFlightRef.current = false;
       setSubmitting(false);
@@ -333,6 +488,7 @@ export default function OrientationWizard() {
     const newCompleted = completedForm ? [...completedForms, completedForm] : completedForms;
     setCompletedForms(newCompleted);
     setHasRead(false);
+    setOpenedDocument(false);
     setShowSignature(false);
     setError(null);
 
@@ -388,7 +544,7 @@ export default function OrientationWizard() {
       className="mx-auto mb-6 flex max-w-xl flex-wrap items-center justify-center gap-3 rounded-2xl border border-warning bg-warning-soft px-4 py-3"
     >
       <p className="text-sm text-warning">
-        We couldn&apos;t save your completion — your progress is safe.
+        We couldn&apos;t save your completion. Your progress is safe.
       </p>
       <button
         type="button"
@@ -422,7 +578,7 @@ export default function OrientationWizard() {
           Almost there!
         </h2>
         <p className="mt-3 text-sm text-[var(--ink-muted)]">
-          You&apos;ve done your part — your instructor is verifying{" "}
+          You&apos;ve done your part. Your instructor is checking{" "}
           <span className="font-semibold text-[var(--ink-strong)]">
             {awaitingCount} {awaitingCount === 1 ? "step" : "steps"}
           </span>
@@ -445,7 +601,7 @@ export default function OrientationWizard() {
           </div>
         </div>
         <p className="mt-4 text-xs text-[var(--ink-faint)]">
-          No need to wait here — keep exploring VisionQuest and check back later.
+          No need to wait here. Keep exploring VisionQuest and check back later.
         </p>
       </div>
     );
@@ -476,7 +632,7 @@ export default function OrientationWizard() {
         >
           <span className="text-success" aria-hidden>✓</span>
           <p className="text-sm text-success">
-            Sent — your instructor will verify &ldquo;{justSentTitle}&rdquo;.
+            {`Sent. Your instructor will check "${justSentTitle}".`}
           </p>
         </div>
       )}
@@ -520,14 +676,14 @@ export default function OrientationWizard() {
           )}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-[var(--border)]">
-          <iframe
-            key={step.form!.id}
-            src={pdfUrl!}
-            title={step.form!.title}
-            className="h-[500px] w-full border-0 bg-[var(--surface-raised)]"
-          />
-        </div>
+        <OrientationDocumentPane
+          key={step.form!.id}
+          url={pdfUrl!}
+          title={step.form!.title}
+          kind={step.type}
+          needsRedo={step.needsRedo}
+          onOpen={() => setOpenedDocument(true)}
+        />
       )}
 
       {/* Action area (the profile form carries its own submit button) */}
@@ -542,23 +698,18 @@ export default function OrientationWizard() {
             disabled={submitting}
             className="primary-button min-h-11 px-6 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {submitting ? "Sending..." : "Mark done — your instructor will verify"}
+            {submitting ? "Sending..." : "Mark done. Your instructor will check it."}
           </button>
         )}
 
         {/* Read checkbox (for sign and acknowledge types) */}
         {(step.type === "sign" || step.type === "acknowledge") && (
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={hasRead}
-              onChange={(e) => setHasRead(e.target.checked)}
-              className="h-5 w-5 rounded border-[var(--border-strong)] text-success focus:ring-success"
-            />
-            <span className="text-sm text-[var(--ink-strong)]">
-              I have read this document
-            </span>
-          </label>
+          <DocumentReadCheckbox
+            checked={hasRead}
+            openedDocument={openedDocument}
+            kind={step.type}
+            onChange={setHasRead}
+          />
         )}
 
         {/* Signature area (sign type only) */}
@@ -575,13 +726,7 @@ export default function OrientationWizard() {
               />
             </div>
           ) : (
-            <button
-              type="button"
-              onClick={() => setShowSignature(true)}
-              className="primary-button min-h-11 px-6 py-2.5 text-sm"
-            >
-              Sign & Continue →
-            </button>
+            <SignStartButton onClick={() => setShowSignature(true)} />
           )
         )}
 
@@ -621,13 +766,13 @@ export default function OrientationWizard() {
             {submitting
               ? step.isLastForItem ? "Sending..." : "Saving..."
               : step.isLastForItem
-                ? "Mark done — your instructor will verify"
+                ? "Mark done. Your instructor will check it."
                 : "Skip & Continue →"}
           </button>
         )}
 
         {error && (
-          <p className="text-sm text-danger">{error}</p>
+          <p role="alert" className="text-sm text-danger">{error}</p>
         )}
       </div>
       )}

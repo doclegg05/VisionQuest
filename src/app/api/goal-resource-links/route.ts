@@ -143,6 +143,9 @@ export const POST = withTeacherAuth(async (session, req: Request) => {
     }).catch((error) => logger.error("Failed to send goal plan notification", { error: errorForLog(error) }));
   }
 
+  // Staff-only route (withTeacherAuth): the instructor's queue must be fresh
+  // on their next fetch, so this waits on the sync on purpose.
+  // eslint-disable-next-line no-restricted-syntax -- staff route awaits the sync on purpose
   await afterWrite(() => syncStudentAlerts(goal.studentId), {
     surface: "goal-resource-links",
     effect: "syncStudentAlerts",

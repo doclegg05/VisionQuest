@@ -14,7 +14,7 @@ export function StaffInvitePanel({ roles, regions }: StaffInvitePanelProps) {
   const [refreshKey, setRefreshKey] = useState(0);
 
   return (
-    <section className="theme-card space-y-5 rounded-xl p-5">
+    <section id="invite-staff" className="theme-card space-y-5 rounded-xl p-5">
       <div>
         <h2 className="text-sm font-semibold text-[var(--ink-strong)]">Invite Staff</h2>
         <p className="mt-1 text-sm text-[var(--ink-muted)]">

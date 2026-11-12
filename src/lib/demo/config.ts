@@ -44,6 +44,17 @@ export function isCohortDemoEnabled(env: DemoEnv = process.env): boolean {
   return env[SWITCH_VARIABLE]?.trim().toLowerCase() === "true";
 }
 
+const REAL_DATA_VARIABLE = "REAL_STUDENT_DATA";
+
+/**
+ * True once the owner has declared that real students are in the database:
+ * `REAL_STUDENT_DATA` is exactly the string `true`. Demo mode must never be on
+ * at the same time (src/lib/boot-probes.ts enforces it at start-up).
+ */
+export function isRealStudentDataDeclared(env: DemoEnv = process.env): boolean {
+  return env[REAL_DATA_VARIABLE] === "true";
+}
+
 export interface DemoLimits {
   /** New demo students one network may start in an hour. */
   perNetworkHourly: number;

@@ -148,8 +148,6 @@ export const DELETE = withTeacherAuth(async (session, req: Request) => {
     where: { id: body.id },
     select: {
       id: true,
-      firstName: true,
-      lastName: true,
       studentId: true,
     },
   });
@@ -175,7 +173,7 @@ export const DELETE = withTeacherAuth(async (session, req: Request) => {
     action: "teacher.spokes.referral.delete",
     targetType: "spokes_record",
     targetId: body.id,
-    summary: `Deleted standalone SPOKES referral for ${referral.firstName} ${referral.lastName}.`,
+    summary: `Deleted a standalone SPOKES referral.`,
     metadata: {
       standaloneReferral: true,
     },

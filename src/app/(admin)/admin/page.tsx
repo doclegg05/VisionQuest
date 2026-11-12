@@ -1,15 +1,17 @@
+import { RegionsCard } from "@/components/admin/RegionsCard";
 import ClassRosterManager from "@/components/teacher/ClassRosterManager";
 import PageIntro from "@/components/ui/PageIntro";
+import { ADMIN_INVITE_ROLES } from "@/components/staff/invite-roles";
 import { OrgPlacementSection } from "@/components/staff/OrgPlacementSection";
 import { StaffInvitePanel } from "@/components/staff/StaffInvitePanel";
 import { getSession } from "@/lib/auth";
 import { listRegionsForSession } from "@/lib/region";
 
-const ADMIN_INVITE_ROLES = ["program_coordinator", "coordinator", "teacher"] as const;
-
 export default async function AdminSettingsPage() {
   const session = await getSession();
   const regions = session ? await listRegionsForSession(session) : [];
+  // The Regions card refreshes this page and announces each change. The cards
+  // below read the new list without a remount, so what was typed in them stays.
   return (
     <div className="page-shell">
       <PageIntro
@@ -72,7 +74,11 @@ export default async function AdminSettingsPage() {
         </a>
       </div>
 
-      <ClassRosterManager />
+      <RegionsCard />
+
+      <div className="mt-6">
+        <ClassRosterManager manageRegions />
+      </div>
 
       {session && (
         <div className="mt-6">

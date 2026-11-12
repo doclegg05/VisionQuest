@@ -3,10 +3,19 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { QrCode as QrIcon } from "@phosphor-icons/react";
+import { ClassRegionField, ClassRegionLine } from "@/components/admin/ClassRegionField";
+import { fetchClassRegions } from "@/components/admin/class-regions";
+import { useRegionsChanged } from "@/components/admin/regions-events";
+import { useClassRegionMove } from "@/components/admin/useClassRegionMove";
+import { CreateClassForm, createClassBody, useCreateClassForm } from "./CreateClassForm";
+import { CreateClassHint, createClassVisibility } from "./CreateClassGate";
+import { CLASS_NOT_SAVED, classRefusalMessage } from "./class-refusals";
 import ProgramBadge from "@/components/ui/ProgramBadge";
 import { normalizeProgramType } from "@/lib/program-type";
 import ClassRequirementEditor from "./ClassRequirementEditor";
 import ClassIntakeFlyerModal from "./ClassIntakeFlyerModal";
+import { MIN_PASSWORD_LENGTH } from "@/lib/password-policy";
+import { useClassActionScroll } from "./useClassActionScroll";
 
 interface InstructorOption {
   id: string;
@@ -55,9 +64,12 @@ interface ClassDetail {
   endDate: string | null;
   instructors: InstructorOption[];
   enrollments: ClassEnrollment[];
+  region: { id: string; name: string } | null;
 }
 
 interface ClassesResponse {
+  viewerRole?: string;
+  currentInstructorId?: string | null;
   classes: ClassSummary[];
   availableInstructors: InstructorOption[];
   regions?: { id: string; name: string }[];
@@ -90,7 +102,8 @@ async function getResponseError(response: Response, fallback: string) {
   return payload?.error || fallback;
 }
 
-export default function ClassRosterManager() {
+/** `manageRegions`: the admin page, which has the Regions card. */
+export default function ClassRosterManager({ manageRegions = false }: { manageRegions?: boolean }) {
   const adminMode = true; // Teachers and admins have the same access level
   const searchParams = useSearchParams();
   const requestedClassId = searchParams.get("classId")?.trim() || "";
@@ -99,26 +112,23 @@ export default function ClassRosterManager() {
   const [selectedClassId, setSelectedClassId] = useState("");
   const [classDetail, setClassDetail] = useState<ClassDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const loadedOnce = useRef(false);
+  const [viewerRole, setViewerRole] = useState("teacher");
   const [detailLoading, setDetailLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [creatingClass, setCreatingClass] = useState(false);
   const [showFlyerModal, setShowFlyerModal] = useState(false);
-  const [newClassName, setNewClassName] = useState("");
-  const [newClassCode, setNewClassCode] = useState("");
-  const [newClassDescription, setNewClassDescription] = useState("");
-  const [newClassStartDate, setNewClassStartDate] = useState("");
-  const [newClassEndDate, setNewClassEndDate] = useState("");
-  const [newInstructorIds, setNewInstructorIds] = useState<string[]>([]);
+  const newClass = useCreateClassForm();
   const [regions, setRegions] = useState<{ id: string; name: string }[]>([]);
-  const [newRegionId, setNewRegionId] = useState("");
   const [className, setClassName] = useState("");
   const [classCode, setClassCode] = useState("");
   const [classDescription, setClassDescription] = useState("");
   const [classStartDate, setClassStartDate] = useState("");
   const [classEndDate, setClassEndDate] = useState("");
   const [selectedInstructorIds, setSelectedInstructorIds] = useState<string[]>([]);
+  const regionMove = useClassRegionMove(classDetail, regions);
 
   // Create student form state
   const [newStudentUsername, setNewStudentUsername] = useState("");
@@ -127,9 +137,13 @@ export default function ClassRosterManager() {
   const [newStudentPassword, setNewStudentPassword] = useState("");
   const [createStudentError, setCreateStudentError] = useState("");
   const [createdCredentials, setCreatedCredentials] = useState<{ username: string; password: string } | null>(null);
+  const preserveActionScroll = useClassActionScroll(
+    creatingClass || saving,
+    !detailLoading && (!selectedClassId || classDetail?.id === selectedClassId || Boolean(error)),
+  );
 
   async function loadClasses(preferredClassId?: string) {
-    setLoading(true);
+    if (!loadedOnce.current) setLoading(true);
     setError("");
     try {
       const response = await fetch(`/api/teacher/classes${adminMode ? "?includeArchived=true" : ""}`);
@@ -141,6 +155,8 @@ export default function ClassRosterManager() {
       setClasses(payload.classes || []);
       setAvailableInstructors(payload.availableInstructors || []);
       setRegions(payload.regions || []);
+      setViewerRole(payload.viewerRole ?? "teacher");
+      newClass.initializeDefaults?.(payload.currentInstructorId ?? null, payload.regions || []);
 
       const nextClassId =
         preferredClassId && payload.classes.some((item) => item.id === preferredClassId)
@@ -156,6 +172,7 @@ export default function ClassRosterManager() {
       setAvailableInstructors([]);
       setSelectedClassId("");
     } finally {
+      loadedOnce.current = true;
       setLoading(false);
     }
   }
@@ -166,7 +183,7 @@ export default function ClassRosterManager() {
       return;
     }
 
-    setDetailLoading(true);
+    if (!classDetail || classDetail.id !== classId) setDetailLoading(true);
     setError("");
     try {
       const response = await fetch(`/api/teacher/classes/${classId}`);
@@ -207,6 +224,9 @@ export default function ClassRosterManager() {
   useEffect(() => {
     void loadClassDetailRef.current(selectedClassId);
   }, [selectedClassId]);
+
+  // Only the region list: a full reload would clear what was typed here.
+  useRegionsChanged(() => fetchClassRegions().then(setRegions, (err: Error) => setError(err.message)));
 
   async function createStudent() {
     if (!selectedClassId) return;
@@ -309,6 +329,8 @@ export default function ClassRosterManager() {
   }
 
   async function createClass() {
+    if (creatingClass) return;
+    preserveActionScroll();
     setCreatingClass(true);
     setError("");
     setMessage("");
@@ -316,40 +338,28 @@ export default function ClassRosterManager() {
       const response = await fetch("/api/teacher/classes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: newClassName,
-          code: newClassCode,
-          description: newClassDescription,
-          startDate: newClassStartDate || null,
-          endDate: newClassEndDate || null,
-          instructorIds: newInstructorIds,
-          regionId: newRegionId,
-        }),
+        body: JSON.stringify(createClassBody(newClass.values)),
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok) {
-        throw new Error(payload?.error || "Could not create the class.");
+        setError(classRefusalMessage({ status: response.status, serverMessage: payload?.error, onAdminPage: manageRegions }));
+        return;
       }
 
       setMessage("Class created.");
-      setNewClassName("");
-      setNewClassCode("");
-      setNewClassDescription("");
-      setNewClassStartDate("");
-      setNewClassEndDate("");
-      setNewInstructorIds([]);
-      setNewRegionId("");
+      newClass.reset();
       await loadClasses(payload?.class?.id);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create the class.");
+    } catch {
+      setError(CLASS_NOT_SAVED);
     } finally {
       setCreatingClass(false);
     }
   }
 
   async function saveClassSettings() {
-    if (!selectedClassId) return;
+    if (saving || !selectedClassId || !(await regionMove.confirmMove())) return;
 
+    preserveActionScroll();
     setSaving(true);
     setError("");
     setMessage("");
@@ -365,18 +375,20 @@ export default function ClassRosterManager() {
           startDate: classStartDate || null,
           endDate: classEndDate || null,
           instructorIds: selectedInstructorIds,
+          ...regionMove.patch(),
         }),
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok) {
-        throw new Error(payload?.error || "Could not save the class settings.");
+        setError(classRefusalMessage({ status: response.status, serverMessage: payload?.error, onAdminPage: manageRegions }));
+        return;
       }
 
       setMessage("Class settings updated.");
       await loadClasses(selectedClassId);
       await loadClassDetail(selectedClassId);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save the class settings.");
+    } catch {
+      setError(CLASS_NOT_SAVED);
     } finally {
       setSaving(false);
     }
@@ -425,14 +437,6 @@ export default function ClassRosterManager() {
     );
   }
 
-  function toggleNewInstructor(instructorId: string) {
-    setNewInstructorIds((current) =>
-      current.includes(instructorId)
-        ? current.filter((id) => id !== instructorId)
-        : [...current, instructorId],
-    );
-  }
-
   if (loading) {
     return <p className="text-sm text-[var(--ink-muted)]">Loading classes...</p>;
   }
@@ -450,106 +454,23 @@ export default function ClassRosterManager() {
         </div>
       ) : null}
 
-      {adminMode ? (
-        <div className="surface-section space-y-4 p-5">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">Admin</p>
-            <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Create a Class</h2>
-            <p className="mt-2 text-sm text-[var(--ink-muted)]">
-              Classes organize students and instructors. Create student accounts from the class roster below.
-            </p>
-          </div>
-          <div className="grid gap-3 md:grid-cols-2">
-            <label className="block space-y-1.5">
-              <span className="block text-sm font-medium text-[var(--ink-strong)]">Class name</span>
-              <input
-                value={newClassName}
-                onChange={(event) => setNewClassName(event.target.value)}
-                className="field px-4 py-3 text-sm"
-              />
-            </label>
-            <label className="block space-y-1.5">
-              <span className="block text-sm font-medium text-[var(--ink-strong)]">Class code</span>
-              <input
-                value={newClassCode}
-                onChange={(event) => setNewClassCode(event.target.value)}
-                className="field px-4 py-3 text-sm"
-              />
-            </label>
-            <label className="block space-y-1.5">
-              <span className="block text-sm font-medium text-[var(--ink-strong)]">Region</span>
-              <select
-                value={newRegionId}
-                onChange={(event) => setNewRegionId(event.target.value)}
-                className="field min-h-11 px-4 py-3 text-sm"
-              >
-                <option value="">Pick a region</option>
-                {regions.map((region) => (
-                  <option key={region.id} value={region.id}>
-                    {region.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block space-y-1.5">
-              <span className="block text-sm font-medium text-[var(--ink-strong)]">Start date</span>
-              <input
-                type="date"
-                value={newClassStartDate}
-                onChange={(event) => setNewClassStartDate(event.target.value)}
-                className="field px-4 py-3 text-sm"
-              />
-            </label>
-            <label className="block space-y-1.5">
-              <span className="block text-sm font-medium text-[var(--ink-strong)]">End date</span>
-              <input
-                type="date"
-                value={newClassEndDate}
-                onChange={(event) => setNewClassEndDate(event.target.value)}
-                className="field px-4 py-3 text-sm"
-              />
-            </label>
-          </div>
-          <label className="block space-y-1.5">
-            <span className="block text-sm font-medium text-[var(--ink-strong)]">Description</span>
-            <textarea
-              value={newClassDescription}
-              onChange={(event) => setNewClassDescription(event.target.value)}
-              rows={3}
-              className="field px-4 py-3 text-sm"
-            />
-          </label>
-          <div className="rounded-2xl border border-[var(--border)] p-4">
-            <p className="text-sm font-semibold text-[var(--ink-strong)]">Assign instructors</p>
-            <div className="mt-3 grid gap-2 md:grid-cols-2">
-              {availableInstructors.map((instructor) => (
-                <label key={instructor.id} className="flex items-center gap-3 rounded-xl border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink-strong)]">
-                  <input
-                    type="checkbox"
-                    checked={newInstructorIds.includes(instructor.id)}
-                    onChange={() => toggleNewInstructor(instructor.id)}
-                  />
-                  <span>{instructor.displayName}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => void createClass()}
-            disabled={creatingClass}
-            className="primary-button px-5 py-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {creatingClass ? "Creating..." : "Create Class"}
-          </button>
-        </div>
-      ) : null}
+      {adminMode && createClassVisibility({ manageRegions, regionCount: regions.length, loading }) === "form" ? (
+        <CreateClassForm
+          form={newClass}
+          regions={regions}
+          instructors={availableInstructors}
+          onAdminPage={manageRegions}
+          showAdminLabel={viewerRole === "admin"}
+          creating={creatingClass}
+          onCreate={() => void createClass()}
+        />
+      ) : <CreateClassHint manageRegions={manageRegions} regionCount={regions.length} loading={loading} isAdmin={viewerRole === "admin"} />}
 
       <div className="surface-section space-y-4 p-5">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">
-              {adminMode ? "Admin settings" : "Teacher roster"}
+              {viewerRole === "admin" ? "Admin settings" : "Class settings"}
             </p>
             <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Class Roster</h2>
           </div>
@@ -590,14 +511,15 @@ export default function ClassRosterManager() {
                     <p className="mt-2 text-sm text-[var(--ink-muted)]">
                       Starts {formatWhen(classDetail.startDate)} • Ends {formatWhen(classDetail.endDate)}
                     </p>
+                    <ClassRegionLine region={classDetail.region} />
                   </div>
                   {adminMode ? (
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
                         onClick={() => void saveClassSettings()}
-                        disabled={saving}
-                        className="inline-flex items-center pointer-coarse:min-h-11 rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+                        aria-disabled={saving}
+                        className="inline-flex items-center pointer-coarse:min-h-11 rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] aria-disabled:cursor-not-allowed aria-disabled:opacity-60"
                       >
                         Save Settings
                       </button>
@@ -632,6 +554,7 @@ export default function ClassRosterManager() {
                           className="field px-4 py-3 text-sm"
                         />
                       </label>
+                      {manageRegions ? <ClassRegionField {...regionMove.field} /> : null}
                       <label className="block space-y-1.5">
                         <span className="block text-sm font-medium text-[var(--ink-strong)]">Start date</span>
                         <input
@@ -738,7 +661,7 @@ export default function ClassRosterManager() {
                     />
                   </label>
                   <p id="new-student-password-help" className="text-xs text-[var(--ink-muted)]">
-                    Use at least 8 characters.
+                    Use at least {MIN_PASSWORD_LENGTH} characters.
                   </p>
                   <button
                     type="button"
@@ -755,7 +678,7 @@ export default function ClassRosterManager() {
                   ) : null}
                   {createdCredentials ? (
                     <div className="rounded-xl border border-[rgba(0,123,175,0.18)] bg-[rgba(0,123,175,0.08)] p-3 text-sm text-[var(--ink-strong)]">
-                      <p className="font-semibold">Account created — share these credentials:</p>
+                      <p className="font-semibold">Account created. Share these sign-in details:</p>
                       <div className="mt-2 space-y-1 font-mono text-sm">
                         <p>Username: <span className="font-semibold">{createdCredentials.username}</span></p>
                         <p>Password: <span className="font-semibold">{createdCredentials.password}</span></p>
@@ -881,6 +804,7 @@ export default function ClassRosterManager() {
           className={classDetail.name}
         />
       ) : null}
+      {regionMove.confirmDialog}
     </div>
   );
 }

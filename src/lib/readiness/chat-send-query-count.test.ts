@@ -1,26 +1,48 @@
 /**
- * M3: database queries `POST /api/chat/send` issues before it creates the
- * response stream (`new ReadableStream` in `src/app/api/chat/send/route.ts`).
+ * M3: database queries `POST /api/chat/send` issues before the student can see
+ * a first word. Two boundaries are measured, and the gate reads the larger:
+ * - before the stream: when the route constructs its response stream
+ *   (`new ReadableStream` in `src/app/api/chat/send/route.ts`)
+ * - before the provider: when the AI provider's `streamResponse` or
+ *   `generateResponse` (or `streamWithTools`, the agent loop's form of
+ *   `streamResponse`) is first called for the turn. Today that call is inside
+ *   the stream's `start()`, so this figure is the larger one.
+ * The target of 12 can only be met by moving work after the first word. Moving
+ * context assembly inside the stream's `start()` lowers the first figure and
+ * not the second, and the student waits just as long.
  *
  * What the numbers are: the Prisma calls the real route, its registry
  * middleware, session lookup, provider resolution, rate limiter, context
  * bundle, retrieval and memory code issue for the fixture below, with
  * `@/lib/db` replaced by a counter and the local AI host's HTTP API answered
- * by a stub. The count stops at the moment the route constructs its stream;
- * what the turn does after that is printed and not pinned. "Cold" is the first
+ * by a stub. Both boundaries are pinned; what the turn does after the provider
+ * call is printed and not pinned. "Cold" is the first
  * turn in a new process. "Warm" is a second turn straight after, with the
- * in-process caches (session, permissions, system configuration, memory
- * profile) the first one filled. The cache invalidation `src/lib/db.ts` runs
- * on writes is mirrored here, so a write that would drop a cache still does.
+ * in-process caches (session, permissions, system configuration, chat
+ * context, memory profile, snippets) the first one filled. The cache
+ * invalidation `src/lib/db.ts` runs on writes is mirrored here, so a write
+ * that would drop a cache still does.
  *
- * What they are not: production truth. No SQL is sent, so the count is of
- * Prisma calls, not statements or round trips. Real data can take branches
- * this fixture does not.
+ * What they are not: production truth. No SQL is sent. Calls are counted and
+ * round trips estimated from them by `estimateRoundTrips` (rules in
+ * src/lib/query-counter.test-support.ts). Real data can take branches this
+ * fixture does not.
  *
  * Read, not executed: 0 queries. `src/proxy.ts` runs before the route and
  * issues none. Nothing on this path had to be counted by reading.
  *
- * The fixture's branches:
+ * The turn it models: an ordinary mid-conversation turn from a returning
+ * student, in the stage the app most often stores for one. `Conversation.stage`
+ * is only ever written by `determineStage` (src/lib/sage/stage.ts) or the two
+ * requested stages in src/lib/chat/conversation.ts; "general", the stage the
+ * first version of this fixture used, is a per-turn prompt override that is
+ * never stored, and it skips four context loads a stored goal stage pays for.
+ * The fixture is "weekly": a BHAG and a monthly goal exist, no weekly goal yet,
+ * discovery complete, which is where a student sits for most of the goal
+ * ladder. "weekly" is in all three stage sets in src/lib/chat/context.ts, so
+ * the skill-gap, pathway and coaching-arc loads run, and the BHAG turns on the
+ * career-thread resume check. "checkin", the end of the ladder, skips the
+ * pathway load and would read cheaper.
  * - a real student (not staff, not a demo account), session not revoked
  * - `ai_provider` is "local": the local-only path production is meant to run.
  *   That means the compact prompt tier, the hourly limit only (no daily
@@ -28,14 +50,20 @@
  *   adds each of those, plus the de-identification identity read
  * - `SAGE_AGENT_MODE=readonly`, as `render.yaml` sets it; memory and
  *   retrieval enabled, as they are when their switches are unset
- * - an existing conversation in the "general" stage with two earlier
- *   messages, already past its one XP award. A new conversation adds the
- *   stage lookup and the conversation writes
- * - a message that is not small talk, names no form, carries no crisis
- *   signal and has no attachment, so retrieval and memory recall both run
- * - retrieval and memory find nothing, and most context reads find nothing
- *   (see "answered by default" in the output). A fuller record takes more
- *   branches after the reads, not more reads before the stream
+ * - an existing conversation with two earlier messages, already past its one
+ *   XP award. A new conversation adds the stage lookup and the conversation
+ *   writes
+ * - a message about planning the week: not small talk, no logistics words (so
+ *   the prompt stage stays "weekly"), no form, no crisis signal, no attachment
+ * - retrieval finds one program document and its best passage (so the passage
+ *   read runs), and memory recall finds one memory. An active coaching arc
+ *   exists, so none is created
+ * - enrolled in one active class, and the in-progress certificate has one
+ *   requirement row, so the class and template loads below them are counted
+ * - reads the turn does not branch on are left empty (see "answered by
+ *   default" in the output). A call left unanswered still counts its nested
+ *   loads in full, and the last test fails on any such call not listed with
+ *   a reason in CHAT_SEND_UNANSWERED_WITH_NESTED
  */
 import assert from "node:assert/strict";
 import { before, describe, it, mock } from "node:test";
@@ -47,24 +75,47 @@ import { createInitialState } from "@/lib/progression/engine";
 import {
   countsByFunction,
   createQueryCounter,
+  estimateRoundTrips,
   formatQueryBreakdown,
   queryCountLine,
   summarizeQueries,
   type RecordedQuery,
+  type RecordedTransaction,
 } from "@/lib/query-counter.test-support";
+import { unansweredLoadProblems, type UnansweredAllowances } from "./unanswered-loads";
 import { signToken } from "@/lib/session-token";
 
 // Set to the measured value. A change to any of these is a change in what a
 // chat turn costs before its first byte, and belongs in the diff that caused it.
-// The 2026-11-10 review estimated 35 to 65 in total by reading. Measured for
-// this fixture: 57 cold (35 + 22) and 33 warm (27 + 6).
-const CHAT_SEND_APP_QUERIES_COLD = 35;
-/** 13 of the 22 are system configuration reads, cached after the first turn. */
+// The 2026-11-10 database review expected 39 to 44 app calls for a normal turn;
+// this fixture measures 43.
+const CHAT_SEND_APP_QUERIES_COLD = 43;
+/** 13 of the 22 are system configuration reads, cached after the first turn; Prisma batches them into 4 statements. */
 const CHAT_SEND_ADMIN_QUERIES_COLD = 22;
-/** Cached between turns: the base chat context (6), the memory profile (1), the snippet list (1). */
-const CHAT_SEND_APP_QUERIES_WARM = 27;
+/** Cached between turns: the base chat context (6), the career-thread resume check, the memory profile, the snippet list, the skill gap (2), the pathway (3). */
+const CHAT_SEND_APP_QUERIES_WARM = 29;
 /** Four audit rows, the rate limit counter and the wager read, every turn. */
 const CHAT_SEND_ADMIN_QUERIES_WARM = 6;
+/**
+ * App plus admin round trips before the route constructs its stream. E7
+ * (2026-11-11) sends the stream's first event right after the message is
+ * saved and moved context assembly inside `start()`, so this fell from 190
+ * and 127: what is left is auth, provider resolution, the rate limit, the
+ * conversation load and the save. The query totals above did not change;
+ * they are pinned on the before-provider section, where the same queries now
+ * all land, and M3 still reads the larger figure.
+ */
+const CHAT_SEND_ROUND_TRIPS_COLD = 18;
+const CHAT_SEND_ROUND_TRIPS_WARM = 12;
+/** [app, admin] queries before the stream since E7: the conversation load and the save, then auth, config, audit and the limiter. */
+const CHAT_SEND_BEFORE_STREAM_COLD: [number, number] = [2, 18];
+const CHAT_SEND_BEFORE_STREAM_WARM: [number, number] = [2, 3];
+/**
+ * App plus admin round trips before the provider is first called. M3 is the
+ * larger of this and the stream figure: what `query-count.mjs chat-send` prints.
+ */
+const CHAT_SEND_ROUND_TRIPS_BEFORE_PROVIDER_COLD = 190;
+const CHAT_SEND_ROUND_TRIPS_BEFORE_PROVIDER_WARM = 127;
 /** "file › function" -> [app, admin] for the cold turn. */
 const CHAT_SEND_COLD_BY_FUNCTION: Record<string, [number, number]> = {
   "src/lib/session-revocation.ts › (anonymous)": [0, 1],
@@ -76,18 +127,29 @@ const CHAT_SEND_COLD_BY_FUNCTION: Record<string, [number, number]> = {
   "src/lib/chat/conversation.ts › getOrCreateConversation": [1, 0],
   "src/lib/chat/conversation.ts › saveMessage": [1, 0],
   "src/lib/program-type-server.ts › getStudentProgramType": [1, 0],
-  "src/app/api/chat/send/route.ts › (anonymous)": [1, 0],
+  "src/lib/chat/turn-context.ts › loadStudentProgram": [1, 0],
   "src/lib/progression/fetch-readiness-data.ts › fetchStudentReadinessData": [8, 0],
   "src/lib/sage/context-bundle.ts › assembleStudentContextBundle": [9, 0],
-  "src/lib/chat/context.ts › (anonymous)": [6, 0],
+  "src/lib/chat/context.ts › (anonymous)": [7, 0],
   "src/lib/sage/wager-metrics.ts › getWagerHitRate": [0, 1],
+  "src/lib/sage/coaching-arcs.ts › getOrCreateCoachingArc": [1, 0],
+  "src/lib/sage/skill-gap.ts › analyzeSkillGaps": [2, 0],
+  "src/lib/learning-pathway.ts › getLearningPathway": [2, 0],
+  "src/lib/progression-edges.ts › loadPrerequisiteMap": [1, 0],
   "src/lib/chat/conversation.ts › getConversationContext": [2, 0],
   "src/lib/sage/memory/profile.ts › (anonymous)": [1, 0],
   "src/lib/llm-usage.ts › logLlmCall": [2, 0],
-  "src/lib/sage/memory/retrieve.ts › retrieveMemories": [1, 0],
   "src/lib/sage/hybrid-retrieval.ts › hybridSearchDocuments": [1, 0],
+  "src/lib/sage/memory/retrieve.ts › retrieveMemories": [1, 0],
   "src/lib/sage/knowledge-base-server.ts › (anonymous)": [1, 0],
+  "src/lib/sage/hybrid-retrieval.ts › getBestChunks": [1, 0],
 };
+/**
+ * Calls on the measured path that no fixture answers although they load a
+ * nested relation, each with why. Anything else unanswered with a nested
+ * relation fails the test below: the empty default hides what real rows load.
+ */
+const CHAT_SEND_UNANSWERED_WITH_NESTED: UnansweredAllowances = {};
 
 const STUDENT_ID = "stu-readiness-001";
 const CONVERSATION_ID = "cm9readiness0000000000000a";
@@ -96,7 +158,7 @@ const SESSION_COOKIE = "vq-session";
 const LOCAL_AI_URL = "http://127.0.0.1:11434";
 const ROUTE_FILE = "src/app/api/chat/send/route.ts";
 /** A different message each turn, as in a real conversation: no turn reuses the other's query embedding. */
-const COLD_MESSAGE = "What should I work on this week to get ready for interviews?";
+const COLD_MESSAGE = "I want to plan my week so I keep moving toward my big goal.";
 const WARM_MESSAGE = "Which of my goals should come first before Friday?";
 const MODEL_REPLY = "Practice two answers out loud.";
 
@@ -126,12 +188,31 @@ function systemConfigRow(args: unknown): { value: string } | null {
   return value === undefined ? null : { value };
 }
 
-/** The rate limiter's upsert must return its counter row; other raw reads find nothing. */
+const DOCUMENT_ID = "doc-weekly-planning";
+
+/**
+ * Raw reads: the rate limiter's counter row, then what a returning student's
+ * turn finds: one program document, its best passage, and one memory.
+ */
 function rawRows(args: unknown): unknown[] {
   const sql = isRecord(args) && typeof args.sql === "string" ? args.sql : "";
-  return sql.includes('"RateLimitEntry"')
-    ? [{ count: 1, resetTime: new Date(NOW.getTime() + 60 * 60 * 1000) }]
-    : [];
+  if (sql.includes('"RateLimitEntry"')) return [{ count: 1, resetTime: new Date(NOW.getTime() + 60 * 60 * 1000) }];
+  if (sql.includes("sage_hybrid_search")) {
+    return [{
+      id: DOCUMENT_ID, title: "Weekly planning guide", storage_key: "docs/weekly-planning.pdf",
+      sageContextNote: "How SPOKES students plan a week of goals.", score: 0.03, semantic_rank: 1, fts_rank: 1, best_distance: 0.2,
+    }];
+  }
+  if (sql.includes('"DocumentChunk"')) {
+    return [{ documentId: DOCUMENT_ID, content: "Pick three tasks for the week.", pageNumber: 1, sectionTitle: null, distance: 0.2 }];
+  }
+  if (sql.includes('"SageMemory"')) {
+    return [{
+      id: "mem-1", kind: "fact", content: "Wants to work in an office.", category: "career",
+      confidence: 0.9, validFrom: NOW, distance: 0.2,
+    }];
+  }
+  return [];
 }
 
 /** The conversation's one XP award was made on an earlier turn. */
@@ -158,12 +239,35 @@ const counter = createQueryCounter({
   $queryRaw: rawRows,
   // Conversation.
   "conversation.findFirst": {
-    id: CONVERSATION_ID, studentId: STUDENT_ID, stage: "general", title: "Interview prep",
+    id: CONVERSATION_ID, studentId: STUDENT_ID, stage: "weekly", title: "Planning my week",
     summary: null, summaryUpToMessageId: null, createdAt: NOW, updatedAt: NOW, messages: [...history].reverse(),
   },
   "conversation.findUnique": { summary: null, summaryUpToMessageId: null },
   "message.findMany": [...history].reverse(),
-  // Student context.
+  // Student context: a returning student with a big goal and a monthly goal, discovery done.
+  "goal.findMany": [
+    { id: "goal-bhag", level: "bhag", content: "Work as an office manager", status: "active", createdAt: NOW, updatedAt: NOW },
+    { id: "goal-month", level: "monthly", content: "Earn the IC3 certification", status: "active", createdAt: NOW, updatedAt: NOW },
+  ],
+  "careerDiscovery.findUnique": {
+    status: "complete", sageSummary: "Likes organizing and helping people.", topClusters: ["office-admin"],
+    hollandCode: "CS", riasecScores: null, nationalClusters: [], workValues: [],
+    transferableSkills: JSON.stringify([{ skill: "Scheduling", category: "organization" }]),
+  },
+  "certification.findMany": [
+    {
+      id: "cert-1", studentId: STUDENT_ID, certType: "ic3", status: "in_progress", startedAt: NOW, completedAt: null,
+      // One requirement row, so the requirement level returns rows and its template load is counted.
+      requirements: [{ completed: false, completedAt: null, verifiedAt: null, template: { required: true } }],
+    },
+  ],
+  // An active enrollment, as an enrolled student has: the class load below it runs.
+  "studentClassEnrollment.findFirst": { class: { programType: "spokes" } },
+  "coachingArc.findUnique": {
+    id: "arc-1", studentId: STUDENT_ID, arcType: "standard_6week", weekNumber: 3, status: "active", startedAt: NOW, milestones: [],
+  },
+  "resumeData.findUnique": { id: "resume-1" },
+  "sageMemory.findMany": [{ id: "mem-1", kind: "fact", content: "Wants to work in an office.", category: "career", confidence: 0.9 }],
   "student.findUnique": { classroomConfirmedAt: NOW },
   "student.findUniqueOrThrow": {
     id: STUDENT_ID, displayName: "Riley Fixture", role: "student", classroomConfirmedAt: NOW, createdAt: NOW,
@@ -217,24 +321,81 @@ globalThis.fetch = async (input, init) => {
   throw new Error(`The chat route made an unexpected network call to ${url}`);
 };
 
-/** Query counts at each moment the route constructed its response stream. */
-const queryCountsAtStreamCreation: number[] = [];
+interface StreamMark {
+  readonly queries: number;
+  readonly transactions: number;
+}
+/** Query and transaction counts at each moment the route constructed its response stream. */
+const queryCountsAtStreamCreation: StreamMark[] = [];
 const THIS_FILE = "chat-send-query-count.test.ts";
 globalThis.ReadableStream = new Proxy(globalThis.ReadableStream, {
   construct(target, args, newTarget) {
     // The first frame outside this file is whoever wrote `new ReadableStream`.
     const frames = (new Error("stream constructed here").stack ?? "").split("\n").slice(1);
     const constructedBy = frames.find((frame) => !frame.includes(THIS_FILE)) ?? "";
-    if (constructedBy.includes(ROUTE_FILE)) queryCountsAtStreamCreation.push(counter.queries().length);
+    if (constructedBy.includes(ROUTE_FILE)) {
+      queryCountsAtStreamCreation.push({ queries: counter.queries().length, transactions: counter.transactions().length });
+    }
     return Reflect.construct(target, args, newTarget);
   },
 });
+
+/** Query and transaction counts at the turn's first call to the provider. */
+const queryCountsAtProviderCall: StreamMark[] = [];
+let providerCalledThisTurn = false;
+
+/**
+ * Marks the turn's first call to the local provider that can produce the
+ * reply: `streamResponse`, `generateResponse`, or `streamWithTools`, which the
+ * agent loop uses in place of `streamResponse`.
+ */
+async function markProviderCalls(): Promise<void> {
+  const { OllamaProvider } = await import("@/lib/ai/ollama-provider");
+  const prototype = OllamaProvider.prototype;
+  const mark = () => {
+    if (providerCalledThisTurn) return;
+    providerCalledThisTurn = true;
+    queryCountsAtProviderCall.push({ queries: counter.queries().length, transactions: counter.transactions().length });
+  };
+  const stream = prototype.streamResponse;
+  prototype.streamResponse = function (this: InstanceType<typeof OllamaProvider>, ...args: Parameters<typeof stream>) {
+    mark();
+    return stream.apply(this, args);
+  };
+  // The readonly agent loop (src/lib/sage/agent/loop.ts) replies through this one.
+  const withTools = prototype.streamWithTools;
+  prototype.streamWithTools = function (this: InstanceType<typeof OllamaProvider>, ...args: Parameters<typeof withTools>) {
+    mark();
+    return withTools.apply(this, args);
+  };
+  const generate = prototype.generateResponse;
+  prototype.generateResponse = function (this: InstanceType<typeof OllamaProvider>, ...args: Parameters<typeof generate>) {
+    mark();
+    return generate.apply(this, args);
+  };
+}
+
+interface Section {
+  readonly queries: readonly RecordedQuery[];
+  readonly transactions: readonly RecordedTransaction[];
+}
 
 interface Turn {
   status: number;
   body: string;
   beforeStream: readonly RecordedQuery[];
-  afterStream: readonly RecordedQuery[];
+  transactionsBeforeStream: readonly RecordedTransaction[];
+  beforeProvider: Section;
+  afterProvider: readonly RecordedQuery[];
+}
+
+/** What the turn issued from its start up to a mark; empty when the mark never happened. */
+function upTo(start: StreamMark, mark: StreamMark | undefined): Section {
+  if (mark === undefined) return { queries: [], transactions: [] };
+  return {
+    queries: counter.queries().slice(start.queries, mark.queries),
+    transactions: counter.transactions().slice(start.transactions, mark.transactions),
+  };
 }
 
 /** Waits until the turn's follow-up work has stopped issuing queries and requests. */
@@ -250,8 +411,10 @@ async function settle(): Promise<void> {
 }
 
 async function sendTurn(post: typeof import("@/app/api/chat/send/route").POST, message: string): Promise<Turn> {
-  const start = counter.queries().length;
+  const start: StreamMark = { queries: counter.queries().length, transactions: counter.transactions().length };
   const marksBefore = queryCountsAtStreamCreation.length;
+  const providerMarksBefore = queryCountsAtProviderCall.length;
+  providerCalledThisTurn = false;
   const response = await post(
     new NextRequest("http://localhost:3000/api/chat/send", {
       method: "POST",
@@ -262,26 +425,53 @@ async function sendTurn(post: typeof import("@/app/api/chat/send/route").POST, m
   );
   const body = await response.text();
   await settle();
-  const streamCreatedAt = queryCountsAtStreamCreation[marksBefore];
-  const all = counter.queries();
+  const beforeStream = upTo(start, queryCountsAtStreamCreation[marksBefore]);
+  const providerMark = queryCountsAtProviderCall[providerMarksBefore];
   return {
     status: response.status,
     body,
-    beforeStream: streamCreatedAt === undefined ? [] : all.slice(start, streamCreatedAt),
-    afterStream: streamCreatedAt === undefined ? all.slice(start) : all.slice(streamCreatedAt),
+    beforeStream: beforeStream.queries,
+    transactionsBeforeStream: beforeStream.transactions,
+    beforeProvider: upTo(start, providerMark),
+    afterProvider: counter.queries().slice(providerMark?.queries ?? start.queries),
   };
+}
+
+/** App plus admin round trips for one section of a turn. */
+function roundTrips(section: Section): number {
+  const { app, admin } = estimateRoundTrips(section.queries, section.transactions);
+  return app.roundTrips + admin.roundTrips;
+}
+
+function streamSection(turn: Turn): Section {
+  return { queries: turn.beforeStream, transactions: turn.transactionsBeforeStream };
+}
+
+/** M3's section: whichever boundary costs more, so moving work inside the stream cannot lower it. */
+function gateSection(turn: Turn): Section {
+  const stream = streamSection(turn);
+  return roundTrips(turn.beforeProvider) > roundTrips(stream) ? turn.beforeProvider : stream;
+}
+
+function reportLines(turn: Turn, cache: "cold" | "warm"): string[] {
+  const gate = gateSection(turn);
+  return [
+    `QUERY_BOUNDARY path=chat-send cache=${cache} beforeStream=${roundTrips(streamSection(turn))} beforeProvider=${roundTrips(turn.beforeProvider)}`,
+    queryCountLine({ path: "chat-send", cache, queries: gate.queries, transactions: gate.transactions, readNotExecuted: 0 }),
+  ];
 }
 
 let cold: Turn;
 let warm: Turn;
 
 before(async () => {
+  await markProviderCalls();
   const { POST } = await import("@/app/api/chat/send/route");
   cold = await sendTurn(POST, COLD_MESSAGE);
   warm = await sendTurn(POST, WARM_MESSAGE);
 });
 
-describe("M3: chat send query count before the response stream", () => {
+describe("M3: chat send query count before the response stream and before the provider call", () => {
   it("answers both turns with a streamed reply, so no step before the stream was skipped", () => {
     for (const turn of [cold, warm]) {
       assert.equal(turn.status, 200);
@@ -289,30 +479,49 @@ describe("M3: chat send query count before the response stream", () => {
       assert.match(turn.body, /"done":true/);
     }
     assert.equal(queryCountsAtStreamCreation.length, 2, "each turn must construct the route's stream once");
+    assert.equal(queryCountsAtProviderCall.length, 2, "each turn must call the provider");
     assert.ok(fetchedUrls.includes(`${LOCAL_AI_URL}/api/embed`), "retrieval did not run");
   });
 
-  it("cold turn issues the pinned number of queries on each client before the stream", (t) => {
+  it("cold turn issues the pinned number of queries on each client before the stream and before the provider", (t) => {
     for (const line of formatQueryBreakdown("M3 chat send, cold, before stream", cold.beforeStream).split("\n")) t.diagnostic(line);
-    const after = summarizeQueries(cold.afterStream);
-    t.diagnostic(`after the stream was created (not pinned): app ${after.app}, admin ${after.admin}`);
-    const summary = summarizeQueries(cold.beforeStream);
-    t.diagnostic(queryCountLine({ path: "chat-send", cache: "cold", queries: cold.beforeStream, readNotExecuted: 0 }));
+    const after = summarizeQueries(cold.afterProvider);
+    t.diagnostic(`after the provider was called (not pinned): app ${after.app}, admin ${after.admin}`);
+    const summary = summarizeQueries(cold.beforeProvider.queries);
+    const stream = summarizeQueries(cold.beforeStream);
+    for (const line of reportLines(cold, "cold")) t.diagnostic(line);
+
+    assert.deepEqual([stream.app, stream.admin], CHAT_SEND_BEFORE_STREAM_COLD);
 
     assert.equal(summary.app, CHAT_SEND_APP_QUERIES_COLD);
     assert.equal(summary.admin, CHAT_SEND_ADMIN_QUERIES_COLD);
+    assert.equal(roundTrips(streamSection(cold)), CHAT_SEND_ROUND_TRIPS_COLD);
+    assert.equal(roundTrips(cold.beforeProvider), CHAT_SEND_ROUND_TRIPS_BEFORE_PROVIDER_COLD);
+    // The number the script prints is the larger of the two.
+    assert.equal(roundTrips(gateSection(cold)), Math.max(CHAT_SEND_ROUND_TRIPS_COLD, CHAT_SEND_ROUND_TRIPS_BEFORE_PROVIDER_COLD));
   });
 
   it("cold turn's queries come from the pinned functions", () => {
-    assert.deepEqual(countsByFunction(cold.beforeStream), CHAT_SEND_COLD_BY_FUNCTION);
+    assert.deepEqual(countsByFunction(cold.beforeProvider.queries), CHAT_SEND_COLD_BY_FUNCTION);
   });
 
-  it("warm turn issues the pinned number of queries on each client before the stream", (t) => {
+  it("warm turn issues the pinned number of queries on each client before the stream and before the provider", (t) => {
     for (const line of formatQueryBreakdown("M3 chat send, warm, before stream", warm.beforeStream).split("\n")) t.diagnostic(line);
-    const summary = summarizeQueries(warm.beforeStream);
-    t.diagnostic(queryCountLine({ path: "chat-send", cache: "warm", queries: warm.beforeStream, readNotExecuted: 0 }));
+    const summary = summarizeQueries(warm.beforeProvider.queries);
+    const stream = summarizeQueries(warm.beforeStream);
+    for (const line of reportLines(warm, "warm")) t.diagnostic(line);
+
+    assert.deepEqual([stream.app, stream.admin], CHAT_SEND_BEFORE_STREAM_WARM);
 
     assert.equal(summary.app, CHAT_SEND_APP_QUERIES_WARM);
     assert.equal(summary.admin, CHAT_SEND_ADMIN_QUERIES_WARM);
+    assert.equal(roundTrips(streamSection(warm)), CHAT_SEND_ROUND_TRIPS_WARM);
+    assert.equal(roundTrips(warm.beforeProvider), CHAT_SEND_ROUND_TRIPS_BEFORE_PROVIDER_WARM);
+    // The number the script prints is the larger of the two.
+    assert.equal(roundTrips(gateSection(warm)), Math.max(CHAT_SEND_ROUND_TRIPS_WARM, CHAT_SEND_ROUND_TRIPS_BEFORE_PROVIDER_WARM));
+  });
+
+  it("answers every call that loads a nested relation, or names it with a reason", () => {
+    assert.deepEqual(unansweredLoadProblems([...cold.beforeProvider.queries, ...warm.beforeProvider.queries], CHAT_SEND_UNANSWERED_WITH_NESTED), []);
   });
 });

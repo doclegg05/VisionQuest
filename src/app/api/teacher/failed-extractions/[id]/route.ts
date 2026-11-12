@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { withTeacherAuth, badRequest, conflict, notFound, type Session } from "@/lib/api-error";
+import { withTeacherAuth, badRequest, conflict, forbidden, notFound, type Session } from "@/lib/api-error";
 import { resolveAiProvider, type AIProvider } from "@/lib/ai";
 import { AiCloudRefusedError } from "@/lib/ai/lanes";
 import {
@@ -8,9 +8,10 @@ import {
   logAiAuditEvent,
   policyDecisionForProvider,
 } from "@/lib/ai/audit";
-import { logAuditEvent } from "@/lib/audit";
+import { logAuditEvent, recordStudentView } from "@/lib/audit";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
+import { isDemoInstructor } from "@/lib/demo/guards";
 import { GOAL_EXTRACTION_KEY, parseGoalExtractionPayload } from "@/lib/sage/failed-extraction";
 import { extractGoals } from "@/lib/sage/goal-extractor";
 import { proposeGoal } from "@/lib/sage/propose-goal";
@@ -150,6 +151,96 @@ async function replayGoalExtraction(session: Session, row: FailedExtractionRow) 
   return NextResponse.json({ success: true, data: { status: "replayed", ...outcomes } });
 }
 
+function parseRowId(id: string): string {
+  if (!z.string().cuid().safeParse(id).success) {
+    throw badRequest("Invalid failed-extraction id.");
+  }
+  return id;
+}
+
+/**
+ * GET /api/teacher/failed-extractions/:id
+ *
+ * One dead-lettered row with its error text and stored payload, which holds
+ * up to 8,000 characters of the student's conversation. The list route
+ * returns neither, so this is the only staff read of that text. A plain read
+ * writes a sampled `failed_extraction` view row against the row's student;
+ * `?include=payload` writes an unsampled `failed_extraction_payload` row on
+ * every fetch, and the chat text is refused if that row cannot be written.
+ *
+ * The shared demo instructor is refused here as well as from the list: the
+ * proxy's read-deny entry names the list path only
+ * (src/lib/demo/instructor-policy.ts).
+ */
+export const GET = withTeacherAuth(async (
+  session,
+  req: Request,
+  { params }: { params: Promise<{ id: string }> },
+) => {
+  if (isDemoInstructor(session)) throw forbidden();
+  // The stored conversation snapshot (up to 8,000 characters of chat) is sent
+  // only when asked for. The panel needs only the error text, so it never
+  // asks. Whether teachers keep chat text at all is an open owner decision.
+  const includePayload = new URL(req.url).searchParams.get("include") === "payload";
+  const id = parseRowId((await params).id);
+  const row = await prisma.failedExtraction.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      studentId: true,
+      conversationId: true,
+      extractorKey: true,
+      error: true,
+      attempts: true,
+      status: true,
+      createdAt: true,
+      payload: true,
+    },
+  });
+  if (!row) throw notFound("Failed extraction not found");
+  const student = await assertStaffCanManageStudent(session, row.studentId);
+
+  const { recorded } = await recordStudentView({
+    actorId: session.id,
+    actorRole: session.role,
+    targetStudentId: student.id,
+    surface: includePayload ? "failed_extraction_payload" : "failed_extraction",
+  });
+  if (includePayload && !recorded) {
+    return NextResponse.json(
+      { error: "The chat text could not be logged, so it was not shown. Please try again." },
+      { status: 500 },
+    );
+  }
+
+  return NextResponse.json({ success: true, data: detailView(row, includePayload) });
+});
+
+interface DetailRow {
+  id: string;
+  conversationId: string | null;
+  extractorKey: string;
+  error: string;
+  attempts: number;
+  status: string;
+  createdAt: Date;
+  payload: string;
+}
+
+/** The row as staff see it; the chat snapshot only when asked for. */
+function detailView(row: DetailRow, includePayload: boolean) {
+  return {
+    id: row.id,
+    conversationId: row.conversationId,
+    extractorKey: row.extractorKey,
+    error: row.error,
+    attempts: row.attempts,
+    status: row.status,
+    createdAt: row.createdAt,
+    ...(includePayload ? { payload: row.payload } : {}),
+  };
+}
+
 /**
  * POST /api/teacher/failed-extractions/:id
  *
@@ -163,10 +254,7 @@ export const POST = withTeacherAuth(async (
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) => {
-  const { id } = await params;
-  if (!z.string().cuid().safeParse(id).success) {
-    throw badRequest("Invalid failed-extraction id.");
-  }
+  const id = parseRowId((await params).id);
   const { action } = await parseBody(req, actionSchema);
 
   const row = await prisma.failedExtraction.findUnique({

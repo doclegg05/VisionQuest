@@ -16,9 +16,16 @@ import { parseBody, resetPasswordSchema } from "@/lib/schemas";
 import { logger } from "@/lib/logger";
 import { studentLogKey } from "@/lib/log-keys";
 
+/**
+ * Link resets per network address per hour. 30 fits a classroom on one
+ * address: the token is 32 random bytes, so 10 stopped only classmates.
+ */
+const NETWORK_LIMIT_ATTEMPTS = 30;
+const NETWORK_LIMIT_WINDOW_MS = 60 * 60 * 1000;
+
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const ip = clientIpBucket(req);
-  const rl = await rateLimit(`reset-password:${ip}`, 10, 60 * 60 * 1000);
+  const rl = await rateLimit(`reset-password:${ip}`, NETWORK_LIMIT_ATTEMPTS, NETWORK_LIMIT_WINDOW_MS);
 
   if (!rl.success) {
     return NextResponse.json({ error: "Too many reset attempts. Please try again later." }, { status: 429 });
@@ -47,7 +54,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     return NextResponse.json({ error: "This reset link has expired or has already been used." }, { status: 400 });
   }
 
-  const { hash } = hashPassword(password);
+  const { hash } = await hashPassword(password);
 
   const result = await prisma.$transaction(async (tx) => {
     const markedUsed = await tx.passwordResetToken.updateMany({
@@ -67,6 +74,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       where: { id: resetRecord.student.id },
       data: {
         passwordHash: hash,
+        // The student chose this password, so nobody else knows it now.
+        mustChangePassword: false,
         sessionVersion: { increment: 1 },
       },
       select: {
@@ -115,7 +124,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     return NextResponse.json({ requiresMfa: true });
   }
 
-  await setSessionCookie(result.studentId, result.role, result.sessionVersion);
+  // Not held to the change-password screen: the flag was cleared just above.
+  await setSessionCookie(result.studentId, result.role, result.sessionVersion, { mustChangePassword: false });
 
   await logAuditEvent({
     actorId: result.studentId,

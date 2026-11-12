@@ -13,6 +13,27 @@ services:
         sync: false
       - key: DIRECT_URL
         sync: false
+      # How many database connections the app's main pool may hold.
+      # src/lib/db.ts adds it to DATABASE_URL as `connection_limit`. Unset,
+      # the pool is 5. A request that finds no free connection waits for one,
+      # and under row-level security each query holds its connection for two
+      # round trips, so 5 is tight for a class of 30 while the database is a
+      # region away. The admin pool is separate and is 10
+      # (ADMIN_DB_POOL_SIZE).
+      #
+      # Stay under the Supabase connection limit for the project: this pool
+      # and the admin pool together, with room left for migrations, pg_cron
+      # and the moment in a deploy when the old and the new copy of the app
+      # may both be running. src/lib/db.ts records 50 as the free tier's
+      # limit. Read the project's own figure in the Supabase dashboard before
+      # choosing.
+      #
+      # The owner sets the value in the Render dashboard once the app and the
+      # database are in one region (readiness O-8). No value here, so a
+      # Blueprint sync never sets or clears it, and the default in code is
+      # unchanged.
+      - key: DB_POOL_SIZE
+        sync: false
       # Both of these were set in the Render dashboard only, so this file did
       # not show that production depends on them and a fresh service created
       # from it would have started with RLS unenforced and prismaAdmin
@@ -38,7 +59,56 @@ services:
         sync: false
       - key: APP_BASE_URL
         sync: false
+      # Optional, and unused while AI_LOCAL_ONLY below is "true": every cloud
+      # call is refused before it is sent. Production runs Sage on a local
+      # model and has no Gemini key. Adding a key here does not turn cloud AI
+      # on.
       - key: GEMINI_API_KEY
+        sync: false
+      # Cloud AI block. The owner's standing decision is that no student data
+      # goes to a cloud model. src/lib/boot-probes.ts refuses to boot
+      # production unless the deployment says which it is: local only, or
+      # cloud allowed on purpose. "true" here is the local only answer. It
+      # refuses every Gemini and OpenRouter call for the whole service,
+      # background work included (src/lib/ai/demo-local-only.ts). The older
+      # switches COHORT_DEMO_LOCAL_ONLY and COHORT_DEMO_MODE do the same but
+      # are named for the demo; this one stays when the demo variables go.
+      # Cloud AI is allowed only by AI_CLOUD_INFERENCE set to exactly
+      # "allowed", after a written owner decision. It is left out of this file
+      # on purpose, and setting it beside this switch stops the boot.
+      - key: AI_LOCAL_ONLY
+        value: "true"
+      # The one local endpoint origin Sage may call while the block is on. This
+      # is the relay's adapter inside this service, not the Mac. A saved
+      # provider URL with any other origin is refused before any network call.
+      # The older name is COHORT_DEMO_LOCAL_AI_ORIGIN; if both are set they
+      # must name the same origin.
+      - key: AI_LOCAL_APPROVED_ORIGIN
+        value: "http://127.0.0.1:11437"
+      # The owner's declaration that real students are in this database. Leave
+      # it unset while the cohort demo runs. Set it to "true" in the dashboard
+      # only after the demo closeout has deleted the demo rows (DEPLOY.md,
+      # "Turn it off after Dec 18, 2026") and before the first real student
+      # gets an account. While it is "true", a production start is refused if
+      # COHORT_DEMO_MODE is on as well, and a start logs an alarm if marked
+      # demo accounts are still in the database (src/lib/boot-probes.ts). No
+      # value here, so a Blueprint sync never sets or clears it.
+      - key: REAL_STUDENT_DATA
+        sync: false
+      # Mac relay (docs/runbooks/mac-sage-connection.md). Production sets this
+      # to "true": scripts/start-production.mjs then starts the relay that
+      # carries Sage's prompts to the Mac's local model, and it also turns the
+      # cloud AI block on. No value here, so turning the relay off in the
+      # dashboard stays off.
+      - key: VQ_MAC_RELAY_ENABLED
+        sync: false
+      # The Mac agent proves itself to the relay with this token. 64 lowercase
+      # hex characters. The same value goes in the Mac agent's private config.
+      - key: VQ_MAC_RELAY_AGENT_TOKEN
+        sync: false
+      # The app proves itself to the relay's adapter with this token. Its own
+      # value, same format. It is never sent to the Mac.
+      - key: VQ_MAC_RELAY_APP_TOKEN
         sync: false
       # Risk-tiered agent enablement. "off" | "readonly" | "full".
       # Stage 6a (readonly) entered 2026-07-08 per docs/runbooks/sage-agent-enablement.md:
@@ -54,6 +124,22 @@ services:
         value: "false"
       - key: SAGE_RAG_ABSTAIN_DISTANCE
         value: "0.40"
+      # Which address the per-network rate limits count (src/lib/client-ip.ts,
+      # readiness A6). Render serves onrender.com through Cloudflare, so the
+      # chain is client, Cloudflare edge, Render's proxy, app, and the app sees
+      # X-Forwarded-For "<client>, <cloudflare edge>". The client is 2 entries
+      # from the right. Too low (1) counts the edge, so every student behind
+      # one edge shares a bucket; too high (3+) reaches the entries the caller
+      # wrote, so the address is forgeable. DEPLOY.md "Check the sign-in
+      # limits' client address" confirms the value after a deploy.
+      - key: TRUSTED_PROXY_HOPS
+        value: "2"
+      # "true" reads CF-Connecting-IP, which Cloudflare sets to the client on
+      # every request it proxies (Cloudflare sits in front of Render's own
+      # domain). Off until the DEPLOY.md check shows that header holds the
+      # real client and no request can reach Render without Cloudflare.
+      - key: CLOUDFLARE_IN_FRONT
+        value: "false"
       - key: CF_ACCESS_CLIENT_ID
         sync: false
       - key: CF_ACCESS_CLIENT_SECRET

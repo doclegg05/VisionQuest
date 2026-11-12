@@ -25,7 +25,7 @@ describe("OrientationWelcomeVideo transcript", () => {
     // Cross-checks the fix against the actual caption file, not just the
     // component: both must agree the video no longer says this.
     const vtt = readFileSync(
-      join(process.cwd(), "public", "media", "sage-welcome-orientation.vtt"),
+      join(process.cwd(), "public", "media", "sage-welcome-orientation-captions-v1.vtt"),
       "utf8",
     );
     assert.ok(!vtt.includes("tap my symbol"));

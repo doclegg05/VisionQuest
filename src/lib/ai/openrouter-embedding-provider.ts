@@ -17,7 +17,7 @@ import { assertCloudInferenceAllowed } from "./demo-local-only";
  *
  * Runbook: docs/runbooks/openrouter-test-bench.md.
  */
-import { EMBEDDING_DIMENSIONS, type EmbeddingProvider, type EmbeddingTaskType } from "./embedding-types";
+import { EMBEDDING_DIMENSIONS, type EmbedOptions, type EmbeddingProvider } from "./embedding-types";
 import {
   DEFAULT_REQUEST_TIMEOUT_MS,
   OPENROUTER_DEFAULT_BASE,
@@ -120,7 +120,7 @@ export class OpenRouterEmbeddingProvider implements EmbeddingProvider {
   /** `taskType` is accepted for the interface; OpenRouter's embeddings API has no equivalent. */
   async embed(
     texts: string[],
-    opts: { taskType: EmbeddingTaskType; callSite?: string; studentId?: string | null },
+    opts: EmbedOptions,
   ): Promise<number[][]> {
     assertCloudInferenceAllowed();
     void opts;

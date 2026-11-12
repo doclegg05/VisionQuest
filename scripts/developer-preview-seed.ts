@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { PrismaClient } from '@prisma/client';
 import { hashPassword } from '../src/lib/auth';
 import { hashSecurityAnswers } from '../src/lib/security-question-auth';
+import { acknowledgeSageNoticeForFixture } from '../src/lib/about-sage/notice-fixture';
 
 async function main() {
   const runtime = process.argv[2];
@@ -17,13 +18,13 @@ async function main() {
     for (const fixture of credentials.accounts) {
       rows.push(await prisma.student.create({ data: {
         studentId: fixture.login, displayName: fixture.name, email: `${fixture.login}@preview.invalid`, role: fixture.role,
-        passwordHash: hashPassword(fixture.password).hash, isActive: true,
+        passwordHash: (await hashPassword(fixture.password)).hash, isActive: true,
       } }));
     }
     const teacher = rows[2];
     const classroom = await prisma.spokesClass.create({ data: { code: 'synthetic-preview', name: 'Synthetic developer preview — no participants', createdById: teacher.id } });
     await prisma.spokesClassInstructor.create({ data: { classId: classroom.id, instructorId: teacher.id } });
-    const recovery = hashSecurityAnswers({ birth_city: 'Synthetic City', elementary_school: 'Synthetic School', favorite_teacher: 'Synthetic Teacher' });
+    const recovery = await hashSecurityAnswers({ birth_city: 'Synthetic City', elementary_school: 'Synthetic School', favorite_teacher: 'Synthetic Teacher' });
     for (const user of rows) {
       for (const answer of recovery) await prisma.securityQuestionAnswer.create({ data: { studentId: user.id, ...answer } });
       if (user.role !== 'student') continue;
@@ -32,6 +33,8 @@ async function main() {
       // One non-signature introductory step avoids a day-one redirect; no
       // certifications or verified participant outcomes are manufactured.
       await prisma.orientationProgress.create({ data: { studentId: user.id, itemId: 'seed-orient-0', completed: true, completedAt: new Date() } });
+      // The preview opens on the student's pages, not on the Sage notice gate.
+      await acknowledgeSageNoticeForFixture(prisma, user.id);
     }
     console.log('Created three synthetic preview accounts with recovery prerequisites; no certifications awarded.');
   } finally { await prisma.$disconnect(); }

@@ -10,6 +10,14 @@ export interface ChatSseEvent {
   conversationId?: string;
   done?: boolean;
   error?: string;
+  /** Why Sage could not answer (a SageFailureCode), on an error event. */
+  failure?: string;
+  /** The 988 block the server added to `error`, when it added one. */
+  crisisBlock?: string;
+  /** On the first event: which 988 block ("en" or "es") the message calls for. */
+  crisisHelp?: string;
+  /** The id of the student's saved message, so Try again can point at it. */
+  userMessageId?: string;
   heartbeat?: boolean;
   quotaWarning?: string;
   text?: string;
@@ -53,6 +61,30 @@ export interface ChatSseParseResult {
   events: ChatSseEvent[];
 }
 
+const STRING_FIELDS = [
+  "conversationId", "error", "failure", "crisisBlock", "crisisHelp", "userMessageId", "quotaWarning", "text",
+  "type", "callId", "tool", "status", "summary", "action", "target", "label", "attachmentId", "storagePath",
+] as const;
+const BOOLEAN_FIELDS = ["done", "heartbeat"] as const;
+
+function hasType(record: object, keys: readonly string[], type: "string" | "boolean"): boolean {
+  return keys.every((key) => {
+    const value: unknown = Object.getOwnPropertyDescriptor(record, key)?.value;
+    return value === undefined || typeof value === type;
+  });
+}
+
+/**
+ * The boundary parse for one event: a JSON object whose known scalar fields
+ * have the types ChatSseEvent declares. Anything else is dropped, so an
+ * `error` that is not a string never reaches the chat as a message.
+ */
+function toChatSseEvent(value: unknown): ChatSseEvent | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
+  if (!hasType(value, STRING_FIELDS, "string") || !hasType(value, BOOLEAN_FIELDS, "boolean")) return null;
+  return value;
+}
+
 function parseEventBlock(block: string): ChatSseEvent | null {
   const dataLines = block
     .split("\n")
@@ -65,8 +97,8 @@ function parseEventBlock(block: string): ChatSseEvent | null {
     .join("\n");
 
   try {
-    const parsed = JSON.parse(payload);
-    return parsed && typeof parsed === "object" ? parsed as ChatSseEvent : null;
+    const parsed: unknown = JSON.parse(payload);
+    return toChatSseEvent(parsed);
   } catch {
     return null;
   }

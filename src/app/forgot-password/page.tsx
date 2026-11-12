@@ -5,6 +5,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import BrandLockup from "@/components/ui/BrandLockup";
 import SecurityQuestionAnswerFields from "@/components/auth/SecurityQuestionAnswerFields";
+import { LOGIN_FIELD_LABEL } from "@/components/auth/login-label";
+import { StudentPasswordField, isPasswordTooShort } from "@/components/settings/StudentPasswordField";
 import { createEmptySecurityQuestionAnswers } from "@/lib/security-questions";
 
 type RecoveryMode = "questions" | "email";
@@ -19,6 +21,8 @@ export default function ForgotPasswordPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [status, setStatus] = useState<RecoveryStatus>("idle");
   const [message, setMessage] = useState("");
+  // True once the questions form was sent, so the password field names a short password.
+  const [passwordSent, setPasswordSent] = useState(false);
 
   async function handleEmailSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -49,10 +53,12 @@ export default function ForgotPasswordPage() {
 
   async function handleQuestionSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setPasswordSent(true);
 
-    if (password.length < 6) {
-      setStatus("error");
-      setMessage("Password must be at least 6 characters.");
+    // The field names this problem itself, counted the way the server counts.
+    if (isPasswordTooShort(password)) {
+      setStatus("idle");
+      setMessage("");
       return;
     }
 
@@ -139,7 +145,7 @@ export default function ForgotPasswordPage() {
             <form onSubmit={handleQuestionSubmit} className="mt-6 space-y-4">
               <div>
                 <label htmlFor="question-login" className="mb-1.5 block text-sm font-medium text-[var(--ink-strong)]">
-                  Email or Student ID
+                  {LOGIN_FIELD_LABEL}
                 </label>
                 <input
                   id="question-login"
@@ -150,7 +156,7 @@ export default function ForgotPasswordPage() {
                   spellCheck={false}
                   value={login}
                   onChange={(e) => setLogin(e.target.value)}
-                  placeholder="you@example.com or student ID"
+                  placeholder="Your username or email"
                   required
                   className="field px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
                 />
@@ -164,21 +170,14 @@ export default function ForgotPasswordPage() {
                 description="Anyone who knows the answers could get into your account this way. Use it only for your classroom's VisionQuest account."
               />
 
-              <div>
-                <label htmlFor="new-password" className="mb-1.5 block text-sm font-medium text-[var(--ink-strong)]">
-                  New password
-                </label>
-                <input
-                  id="new-password"
-                  type="password"
-                  autoComplete="new-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="At least 6 characters"
-                  required
-                  className="field px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
-                />
-              </div>
+              <StudentPasswordField
+                id="new-password"
+                label="New password"
+                value={password}
+                onChange={setPassword}
+                autoComplete="new-password"
+                showError={passwordSent}
+              />
 
               <div>
                 <label htmlFor="confirm-password" className="mb-1.5 block text-sm font-medium text-[var(--ink-strong)]">
@@ -221,7 +220,7 @@ export default function ForgotPasswordPage() {
             <form onSubmit={handleEmailSubmit} className="mt-6 space-y-4">
               <div>
                 <label htmlFor="email-login" className="mb-1.5 block text-sm font-medium text-[var(--ink-strong)]">
-                  Email or Student ID
+                  {LOGIN_FIELD_LABEL}
                 </label>
                 <input
                   id="email-login"
@@ -232,7 +231,7 @@ export default function ForgotPasswordPage() {
                   spellCheck={false}
                   value={login}
                   onChange={(e) => setLogin(e.target.value)}
-                  placeholder="you@example.com or student ID"
+                  placeholder="Your username or email"
                   required
                   className="field px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
                 />

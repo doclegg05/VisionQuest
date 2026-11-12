@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { syncStudentAlerts } from "@/lib/advising";
+import { deferPerStudent } from "@/lib/after-response";
 import { afterWrite } from "@/lib/after-write";
 import { badRequest, forbidden, isStaffRole, notFound, withAuth } from "@/lib/api-error";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
@@ -100,12 +101,16 @@ export const PATCH = withAuth(async (
   });
 
   // The update is saved. The alert sync is best-effort from here: a failure
-  // is logged, never reported as a failed status change.
-  await afterWrite(() => syncStudentAlerts(link.studentId), {
-    surface: "goal-resource-links/[id]",
-    effect: "syncStudentAlerts",
-    studentId: link.studentId,
-  });
+  // is logged, never reported as a failed status change. A student's answer
+  // does not wait on it (src/lib/after-response.ts); staff still wait, so the
+  // instructor's queue is fresh on their next fetch.
+  const syncContext = { surface: "goal-resource-links/[id]", effect: "syncStudentAlerts" };
+  if (isStaffRole(session.role)) {
+    // eslint-disable-next-line no-restricted-syntax -- staff path awaits the sync on purpose
+    await afterWrite(() => syncStudentAlerts(link.studentId), { ...syncContext, studentId: link.studentId });
+  } else {
+    deferPerStudent(link.studentId, syncContext, () => syncStudentAlerts(link.studentId));
+  }
 
   return NextResponse.json({ link: toGoalResourceLinkView(updated) });
 });

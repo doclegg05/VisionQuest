@@ -1,17 +1,17 @@
 {
-  "generatedAt": "2026-11-10T19:33:44.136Z",
-  "commit": "cb5e96b2",
-  "flags": "none",
-  "ciGreen": null,
+  "generatedAt": "2026-11-12T17:34:44.697Z",
+  "commit": "dd61c17c-dirty",
+  "flags": "--ci-green=https://github.com/doclegg05/VisionQuest/actions/runs/43267766862",
+  "ciGreen": "https://github.com/doclegg05/VisionQuest/actions/runs/43267766862",
   "scores": [
     {
       "label": "Launch tasks",
-      "passed": 3,
-      "total": 34
+      "passed": 39,
+      "total": 40
     },
     {
       "label": "Launch metrics",
-      "passed": 0,
+      "passed": 3,
       "total": 5
     },
     {
@@ -21,8 +21,8 @@
     },
     {
       "label": "Pilot tasks",
-      "passed": 0,
-      "total": 26
+      "passed": 1,
+      "total": 35
     },
     {
       "label": "Pilot metrics",
@@ -37,7 +37,7 @@
       "set": "launch",
       "title": "Readiness scorecard",
       "status": "pass",
-      "detail": "66 tests passed"
+      "detail": "68 tests passed"
     },
     {
       "id": "T2",
@@ -45,7 +45,7 @@
       "set": "launch",
       "title": "Query counter",
       "status": "pass",
-      "detail": "36 tests passed"
+      "detail": "56 tests passed"
     },
     {
       "id": "T3",
@@ -60,32 +60,49 @@
       "kind": "task",
       "set": "pilot",
       "title": "Counter fidelity",
+      "status": "pass",
+      "detail": "69 tests passed"
+    },
+    {
+      "id": "T5",
+      "kind": "task",
+      "set": "pilot",
+      "title": "Check the counter against a real database",
       "status": "pending",
       "detail": "no check yet"
+    },
+    {
+      "id": "T6",
+      "kind": "task",
+      "set": "launch",
+      "title": "First-day browser test in CI",
+      "status": "pass",
+      "detail": "not run here: green in CI run https://github.com/doclegg05/VisionQuest/actions/runs/43267766862 (1 test file found)",
+      "via": "ci"
     },
     {
       "id": "A1",
       "kind": "task",
       "set": "launch",
       "title": "Classroom-safe sign-in limits",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "141 tests passed"
     },
     {
       "id": "A2",
       "kind": "task",
       "set": "launch",
       "title": "One password rule",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "76 tests passed"
     },
     {
       "id": "A3",
       "kind": "task",
       "set": "launch",
       "title": "Students can change a password, and must after staff set one",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "456 tests passed"
     },
     {
       "id": "A4",
@@ -104,28 +121,36 @@
       "detail": "no check yet"
     },
     {
+      "id": "A6",
+      "kind": "task",
+      "set": "launch",
+      "title": "The sign-in limits count the real client address",
+      "status": "pass",
+      "detail": "122 tests passed"
+    },
+    {
       "id": "B1",
       "kind": "task",
       "set": "launch",
       "title": "Regions screen",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "347 tests passed"
     },
     {
       "id": "B2",
       "kind": "task",
       "set": "launch",
       "title": "An unplaced instructor is not stranded",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "21 tests passed"
     },
     {
       "id": "B3",
       "kind": "task",
       "set": "launch",
       "title": "First-day guidance",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "101 tests passed"
     },
     {
       "id": "B4",
@@ -136,28 +161,36 @@
       "detail": "no check yet"
     },
     {
+      "id": "B5",
+      "kind": "task",
+      "set": "pilot",
+      "title": "Archiving a region ends its coordinators' access",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
       "id": "C1",
       "kind": "task",
       "set": "launch",
       "title": "Verify buttons report failure",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "153 tests passed"
     },
     {
       "id": "C2",
       "kind": "task",
       "set": "launch",
       "title": "Alert age is real",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "23 tests passed"
     },
     {
       "id": "C3",
       "kind": "task",
       "set": "launch",
       "title": "Queue actions can be undone",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "125 tests passed"
     },
     {
       "id": "C4",
@@ -192,28 +225,60 @@
       "detail": "no check yet"
     },
     {
+      "id": "C8",
+      "kind": "task",
+      "set": "pilot",
+      "title": "Student page polish from the C1 reviews",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "C9",
+      "kind": "task",
+      "set": "launch",
+      "title": "Alert audit and conflict checks (delivered with C11)",
+      "status": "pass",
+      "detail": "27 tests passed"
+    },
+    {
+      "id": "C10",
+      "kind": "task",
+      "set": "pilot",
+      "title": "Queue polish from the C3 reviews",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "C11",
+      "kind": "task",
+      "set": "launch",
+      "title": "Alert Undo never overwrites a newer action",
+      "status": "pass",
+      "detail": "59 tests passed"
+    },
+    {
       "id": "D1",
       "kind": "task",
       "set": "launch",
       "title": "The signed-form banner is removed from the student home, per R5",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "6 tests passed"
     },
     {
       "id": "D2",
       "kind": "task",
       "set": "launch",
       "title": "Orientation documents open on phones",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "26 tests passed"
     },
     {
       "id": "D3",
       "kind": "task",
       "set": "launch",
       "title": "Sign-in form first on phones",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "20 tests passed"
     },
     {
       "id": "D4",
@@ -268,16 +333,16 @@
       "kind": "task",
       "set": "launch",
       "title": "Honest failure states",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "337 tests passed"
     },
     {
       "id": "E2",
       "kind": "task",
       "set": "launch",
       "title": "A wait the student can read",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "85 tests passed"
     },
     {
       "id": "E3",
@@ -308,8 +373,8 @@
       "kind": "task",
       "set": "launch",
       "title": "\"Sage is an AI and can be wrong\" under the message box, linked to the notice page",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "65 tests passed"
     },
     {
       "id": "E7",
@@ -328,28 +393,36 @@
       "detail": "no check yet"
     },
     {
+      "id": "E9",
+      "kind": "task",
+      "set": "launch",
+      "title": "Chat never traps a student waiting",
+      "status": "pass",
+      "detail": "125 tests passed"
+    },
+    {
       "id": "F1",
       "kind": "task",
       "set": "launch",
       "title": "Pool and session",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "196 tests passed"
     },
     {
       "id": "F2",
       "kind": "task",
       "set": "launch",
       "title": "Dashboard read diet",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "153 tests passed"
     },
     {
       "id": "F3",
       "kind": "task",
       "set": "launch",
       "title": "Bookkeeping after the response",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "202 tests passed"
     },
     {
       "id": "F4",
@@ -384,28 +457,36 @@
       "detail": "no check yet"
     },
     {
+      "id": "F8",
+      "kind": "task",
+      "set": "pilot",
+      "title": "Alert sync follow-ups from the F3 database review",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
       "id": "G1",
       "kind": "task",
       "set": "launch",
       "title": "Pages show before JavaScript runs",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "4 tests passed"
     },
     {
       "id": "G2",
       "kind": "task",
       "set": "launch",
       "title": "Lighter sign-in",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "34 tests passed"
     },
     {
       "id": "G3",
       "kind": "task",
       "set": "launch",
       "title": "Smaller orientation video",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "7 tests passed"
     },
     {
       "id": "G4",
@@ -444,64 +525,64 @@
       "kind": "task",
       "set": "launch",
       "title": "Errors reach a person",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "471 tests passed"
     },
     {
       "id": "H2",
       "kind": "task",
       "set": "launch",
       "title": "Demo and real students can never coexist",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "100 tests passed"
     },
     {
       "id": "H3",
       "kind": "task",
       "set": "launch",
       "title": "Sage's state is visible",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "16 tests passed"
     },
     {
       "id": "H4",
       "kind": "task",
       "set": "launch",
       "title": "The block on cloud AI is explicit",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "133 tests passed"
     },
     {
       "id": "H5",
       "kind": "task",
       "set": "launch",
       "title": "Jobs survive a restart",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "23 tests passed"
     },
     {
       "id": "H6",
       "kind": "task",
       "set": "launch",
       "title": "Notice and acknowledgement",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "99 tests passed"
     },
     {
       "id": "H7",
       "kind": "task",
       "set": "launch",
       "title": "Release hygiene",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "4 tests passed"
     },
     {
       "id": "H8",
       "kind": "task",
       "set": "launch",
       "title": "Incident basics page at `docs/runbooks/incident-basics.md`",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "1 of 1 row verified"
     },
     {
       "id": "H9",
@@ -516,32 +597,73 @@
       "kind": "task",
       "set": "launch",
       "title": "Demo closeout kit",
+      "status": "pass",
+      "detail": "not run here: green in CI run https://github.com/doclegg05/VisionQuest/actions/runs/43267766862 (10 test files found)",
+      "via": "ci"
+    },
+    {
+      "id": "H11",
+      "kind": "task",
+      "set": "pilot",
+      "title": "Delivery jobs have known bounds",
       "status": "pending",
       "detail": "no check yet"
+    },
+    {
+      "id": "H12",
+      "kind": "task",
+      "set": "pilot",
+      "title": "Error reporting stays small in the browser",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "H13",
+      "kind": "task",
+      "set": "pilot",
+      "title": "Error reporting follow-ups from the two privacy audits",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "H14",
+      "kind": "task",
+      "set": "pilot",
+      "title": "The closeout removes demo files from storage",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "H15",
+      "kind": "task",
+      "set": "launch",
+      "title": "Every staff read of one student's record is written down",
+      "status": "pass",
+      "detail": "197 tests passed"
     },
     {
       "id": "M1",
       "kind": "metric",
       "set": "launch",
       "title": "Estimated database round trips for one student dashboard render",
-      "status": "fail",
-      "detail": "167 round trips (target at most 85, baseline 167)"
+      "status": "pass",
+      "detail": "79 round trips (target at most 85, baseline 163)"
     },
     {
       "id": "M2",
       "kind": "metric",
       "set": "launch",
       "title": "Statements per open dashboard per minute at idle",
-      "status": "unmeasured",
-      "detail": "no measuring command yet (target at most 8, baseline 60)"
+      "status": "pass",
+      "detail": "7.1 statements per minute (target at most 8, baseline 60)"
     },
     {
       "id": "M3",
       "kind": "metric",
       "set": "pilot",
       "title": "Estimated database round trips before chat sends its first byte",
-      "status": "unmeasured",
-      "detail": "no measuring command yet (target at most 12, baseline 167)"
+      "status": "fail",
+      "detail": "190 round trips (target at most 12, baseline 190)"
     },
     {
       "id": "M4",
@@ -556,8 +678,8 @@
       "kind": "metric",
       "set": "launch",
       "title": "Orientation video size",
-      "status": "fail",
-      "detail": "34.7 MB (target at most 10, baseline 34.7)"
+      "status": "pass",
+      "detail": "9.5 MB (target at most 10, baseline 34.7)"
     },
     {
       "id": "M6",
@@ -565,7 +687,7 @@
       "set": "pilot",
       "title": "Estimated database round trips for one teacher home render",
       "status": "fail",
-      "detail": "111 round trips (target at most 60, baseline 111)"
+      "detail": "114 round trips (target at most 60, baseline 114)"
     },
     {
       "id": "M7",
@@ -573,7 +695,7 @@
       "set": "launch",
       "title": "Production `/api/health` `latency_ms`",
       "status": "fail",
-      "detail": "535 ms (target at most 60, baseline 530)"
+      "detail": "935 ms (target at most 60, baseline 530)"
     },
     {
       "id": "M8",
@@ -629,7 +751,7 @@
       "set": "launch",
       "title": "Render in line with render.yaml",
       "status": "owner-open",
-      "detail": "0 of 5 rows verified"
+      "detail": "0 of 6 rows verified"
     },
     {
       "id": "O-7",
@@ -653,7 +775,7 @@
       "set": "pilot",
       "title": "Notice wording, retention numbers and staff MFA policy approved",
       "status": "owner-open",
-      "detail": "0 of 3 rows verified"
+      "detail": "1 of 3 rows verified"
     },
     {
       "id": "O-10",

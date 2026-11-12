@@ -1,6 +1,7 @@
 import { randomBytes } from "crypto";
 import { NextResponse } from "next/server";
 import { syncStudentAlerts } from "@/lib/advising";
+import { deferPerStudent } from "@/lib/after-response";
 import { prisma } from "@/lib/db";
 import { withAuth } from "@/lib/api-error";
 import { assertNotDemoAccount } from "@/lib/demo/guards";
@@ -105,7 +106,9 @@ export const POST = withAuth(async (session, req: Request) => {
     },
   });
 
-  await syncStudentAlerts(session.id);
+  deferPerStudent(session.id, { surface: "credentials/share", effect: "syncStudentAlerts" }, () =>
+    syncStudentAlerts(session.id),
+  );
 
   const baseUrl = process.env.APP_BASE_URL || new URL(req.url).origin;
 

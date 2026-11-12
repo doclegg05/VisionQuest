@@ -16,6 +16,7 @@ import { awardEvent } from "@/lib/progression/events";
 import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { syncStudentAlerts } from "@/lib/advising";
+import { deferPerStudent } from "@/lib/after-response";
 
 const optionalCuidSchema = z.preprocess(
   (value) => value === "" ? null : value,
@@ -184,7 +185,9 @@ export const POST = withAuth(async (session, req: Request) => {
     logger.error("Failed to record portfolio progression", { error: errorForLog(err) });
   }
 
-  await syncStudentAlerts(session.id);
+  deferPerStudent(session.id, { surface: "portfolio", effect: "syncStudentAlerts" }, () =>
+    syncStudentAlerts(session.id),
+  );
 
   return NextResponse.json({ item });
 });
@@ -217,7 +220,9 @@ export const PUT = withAuth(async (session, req: Request) => {
   if (url !== undefined) data.url = url || null;
 
   const item = await prisma.portfolioItem.update({ where: { id }, data });
-  await syncStudentAlerts(session.id);
+  deferPerStudent(session.id, { surface: "portfolio", effect: "syncStudentAlerts" }, () =>
+    syncStudentAlerts(session.id),
+  );
   return NextResponse.json({ item });
 });
 
@@ -231,6 +236,8 @@ export const DELETE = withAuth(async (session, req: Request) => {
   if (!existing) throw notFound("Not found");
 
   await prisma.portfolioItem.delete({ where: { id } });
-  await syncStudentAlerts(session.id);
+  deferPerStudent(session.id, { surface: "portfolio", effect: "syncStudentAlerts" }, () =>
+    syncStudentAlerts(session.id),
+  );
   return NextResponse.json({ ok: true });
 });

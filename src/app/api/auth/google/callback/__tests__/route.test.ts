@@ -25,6 +25,8 @@ const GOOGLE_EMAIL = "Teacher@Example.com";
 
 type CookieRecord = { studentId: string; role: string; sessionVersion: number };
 const cookieSets: CookieRecord[] = [];
+/** The options each session cookie was issued with, in call order. */
+const cookieOptions: unknown[] = [];
 const mfaCookieSets: string[] = [];
 
 // The payload the mocked Google verifier hands back. Tests set it per case.
@@ -42,8 +44,9 @@ const mockLoggerError = mock.fn() as any;
 mock.module("@/lib/auth", {
   namedExports: {
     normalizeEmail: (raw: string) => raw.trim().toLowerCase(),
-    setSessionCookie: async (studentId: string, role: string, sessionVersion: number) => {
+    setSessionCookie: async (studentId: string, role: string, sessionVersion: number, options: unknown) => {
       cookieSets.push({ studentId, role, sessionVersion });
+      cookieOptions.push(options);
       return "fake-jwt-token";
     },
     signMfaSessionToken: (id: string) => `mfa-token-for-${id}`,
@@ -212,6 +215,7 @@ function assertNoGoogleIdentityIn(value: unknown, label: string) {
 describe("GET /api/auth/google/callback", () => {
   beforeEach(() => {
     cookieSets.length = 0;
+    cookieOptions.length = 0;
     mfaCookieSets.length = 0;
     mockFindUnique.mock.resetCalls();
     mockFindFirst.mock.resetCalls();
@@ -339,6 +343,36 @@ describe("GET /api/auth/google/callback", () => {
     assert.equal(mockUpdate.mock.callCount(), 0);
     assert.equal(mockCreate.mock.callCount(), 0);
     assert.equal(auditActions().includes("auth.google_link"), false);
+  });
+
+  // Readiness A3: a Google sign-in is one more place a session is issued, so
+  // it answers the same question the password route does. A student whose
+  // password staff set is held to the change-password screen however they
+  // signed in; the page they are sent to is then swapped by src/proxy.ts.
+  it("holds a student whose password staff set", async () => {
+    seedLookup({ bySub: student({ googleId: GOOGLE_SUB, role: "student", mustChangePassword: true, demoAccount: null }) });
+
+    await route.GET(callbackRequest() as never);
+
+    assert.deepEqual(cookieOptions, [{ mustChangePassword: true }]);
+  });
+
+  it("does not hold a flagged student who has no password: there is nothing to change", async () => {
+    seedLookup({
+      bySub: student({ googleId: GOOGLE_SUB, role: "student", mustChangePassword: true, passwordHash: null, demoAccount: null }),
+    });
+
+    await route.GET(callbackRequest() as never);
+
+    assert.deepEqual(cookieOptions, [{ mustChangePassword: false }]);
+  });
+
+  it("does not hold an account with nothing to change", async () => {
+    seedLookup({ bySub: student({ googleId: GOOGLE_SUB, mustChangePassword: false, demoAccount: null }) });
+
+    await route.GET(callbackRequest() as never);
+
+    assert.deepEqual(cookieOptions, [{ mustChangePassword: false }]);
   });
 
   it("does not bind the sub on an MFA-enabled unbound account: challenge only, no write", async () => {

@@ -41,7 +41,7 @@ export const POST = withTeacherAuth(async (
     throw badRequest("That email is already registered.");
   }
 
-  const { hash } = hashPassword(password);
+  const { hash } = await hashPassword(password);
 
   const student = await prisma.$transaction(async (tx) => {
     const created = await tx.student.create({
@@ -49,6 +49,10 @@ export const POST = withTeacherAuth(async (
         studentId,
         displayName,
         passwordHash: hash,
+        // Staff typed this password, so staff know it. The student is held
+        // to the change-password screen until they pick their own
+        // (src/lib/password-change-gate.ts).
+        mustChangePassword: true,
         email: email || null,
         role: "student",
       },
@@ -71,7 +75,7 @@ export const POST = withTeacherAuth(async (
     action: "class.student.create",
     targetType: "student",
     targetId: student.id,
-    summary: `Created student ${student.studentId} and enrolled in ${managedClass.name}.`,
+    summary: `Created a student and enrolled them in ${managedClass.name}.`,
     metadata: { classId, studentId: student.id },
   });
 

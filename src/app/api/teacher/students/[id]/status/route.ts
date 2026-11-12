@@ -46,7 +46,7 @@ export const PATCH = withTeacherAuth(async (
     action: isActive ? "teacher.student.reactivate" : "teacher.student.deactivate",
     targetType: "student",
     targetId: id,
-    summary: `${isActive ? "Reactivated" : "Deactivated"} student ${student.studentId}.`,
+    summary: `${isActive ? "Reactivated" : "Deactivated"} the student.`,
   });
 
   // Auto-archive on deactivation (fire-and-forget)

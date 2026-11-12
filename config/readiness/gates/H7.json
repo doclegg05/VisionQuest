@@ -5,6 +5,10 @@
   "title": "Release hygiene",
   "doneWhen": "A workflow test pins the filter. `/robots.txt` is served.",
   "check": {
-    "type": "pending"
+    "type": "test",
+    "files": [
+      "src/lib/sage-evals-workflow.test.ts",
+      "src/lib/robots-txt.test.ts"
+    ]
   }
 }

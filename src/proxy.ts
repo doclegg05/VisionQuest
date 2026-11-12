@@ -3,6 +3,12 @@ import { isAuthorizedInternalRequest, isSignedWebhookPath, isUrlHostMatch } from
 import { isCohortDemoEnabled } from "@/lib/demo/config";
 import { DEMO_READ_ONLY_REFUSAL } from "@/lib/demo/copy";
 import { isDemoInstructorRequestAllowed } from "@/lib/demo/instructor-policy";
+import {
+  PASSWORD_CHANGE_PATH,
+  PASSWORD_CHANGE_REQUIRED_CODE,
+  PASSWORD_CHANGE_REQUIRED_MESSAGE,
+  isAllowedWhilePasswordChangeRequired,
+} from "@/lib/password-change-gate";
 import { verifyToken, type SessionClaims } from "@/lib/session-token";
 import {
   RLS_HEADER_NAMES,
@@ -14,6 +20,28 @@ import {
 
 const isProduction = process.env.NODE_ENV === "production";
 const SESSION_COOKIE_NAME = "vq-session";
+
+/**
+ * The `connect-src` entry for the browser's error reports: the exact origin
+ * the public DSN names (`https://o123.ingest.us.sentry.io`), or nothing when
+ * no DSN is set. A fixed `https://*.ingest.sentry.io` was here before; a CSP
+ * wildcard covers one label, so it never matched a regional ingest host and
+ * the browser refused every report. The DSN's key is not part of an origin.
+ *
+ * The origin is added only when it is an `https:` URL whose host is plain
+ * labels (letters, digits and hyphens, with dots between) and whose port is
+ * empty or digits. `new URL` accepts `*`, `,`, `;` and `'` in a host, so a
+ * DSN whose host is `*` would otherwise allow every https host, and a host
+ * of `a.com;script-src` would end this directive and start another.
+ * Anything else adds nothing, and the browser then refuses the reports.
+ */
+function sentryConnectSource(): string {
+  const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
+  if (!dsn || !URL.canParse(dsn)) return "";
+  const { protocol, hostname, port, origin } = new URL(dsn);
+  const plainOrigin = protocol === "https:" && /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(hostname) && /^\d*$/.test(port);
+  return plainOrigin ? ` ${origin}` : "";
+}
 
 let warnedStyleRelaxIgnored = false;
 
@@ -44,6 +72,8 @@ function styleSrcElemRelaxed(): boolean {
 //   7. Cohort demo fence: a demo session is treated as signed out once the
 //      switch is off, and the shared demo instructor is held to
 //      src/lib/demo/instructor-policy.ts. Both checks need no database.
+//   8. Forced password change: a session whose token says its holder must
+//      choose a new password is held to src/lib/password-change-gate.ts.
 // The static CSP in next.config.ts has been removed — this proxy is the single source of truth.
 // Referrer-Policy and X-Content-Type-Options are NOT set here: next.config.ts
 // `headers()` already applies both (plus HSTS and X-Frame-Options) to `/(.*)`.
@@ -80,6 +110,24 @@ function sessionClaimsFor(request: NextRequest): SessionClaims | null {
   const claims = token ? verifyToken(token) : null;
   if (claims?.demo !== undefined && !isCohortDemoEnabled()) return null;
   return claims;
+}
+
+/**
+ * The answer for a session that must change its password and asked for
+ * anything else. An API route gets a 403 a client can read by its code. A
+ * page is sent to the change screen: 307 for a read, and 303 for anything
+ * else so the browser follows with a GET and not the same refused method.
+ */
+function holdForPasswordChange(request: NextRequest, method: string, isApi: boolean): NextResponse {
+  if (isApi) {
+    return NextResponse.json(
+      { error: PASSWORD_CHANGE_REQUIRED_MESSAGE, code: PASSWORD_CHANGE_REQUIRED_CODE },
+      { status: 403 },
+    );
+  }
+  const url = request.nextUrl.clone();
+  url.pathname = PASSWORD_CHANGE_PATH;
+  return NextResponse.redirect(url, method === "GET" || method === "HEAD" ? 307 : 303);
 }
 
 export function proxy(request: NextRequest) {
@@ -144,6 +192,17 @@ export function proxy(request: NextRequest) {
     return NextResponse.json({ error: DEMO_READ_ONLY_REFUSAL }, { status: 403 });
   }
 
+  // --- Forced password change ---
+  // After the CSRF check, for the same reason as the demo fence. This runs
+  // for pages and API routes alike, before any handler: a layout redirect
+  // never runs for an API route, so it could not hold the session by itself.
+  // The claim is signed, and the proxy has no database to ask, so the claim
+  // is what it enforces; getSession() ends a session whose claim and account
+  // row disagree (src/lib/auth.ts).
+  if (claims?.mustChangePassword === true && !isAllowedWhilePasswordChangeRequired(method, pathname)) {
+    return holdForPasswordChange(request, method, isApi);
+  }
+
   // --- CSP nonce + response headers ---
   const nonce = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString("base64");
 
@@ -166,7 +225,7 @@ export function proxy(request: NextRequest) {
     "style-src-attr 'unsafe-inline'",
     "font-src 'self' https://fonts.gstatic.com",
     "img-src 'self' data: blob: https://images.credly.com https://www.credly.com",
-    "connect-src 'self' https://generativelanguage.googleapis.com https://*.ingest.sentry.io",
+    `connect-src 'self' https://generativelanguage.googleapis.com${sentryConnectSource()}`,
     // frame-src 'self' so the Library's same-origin PDF preview iframe
     // (sourced from /api/documents/download?mode=view) can render. Files
     // stream through our own origin, never a cross-origin presigned URL.

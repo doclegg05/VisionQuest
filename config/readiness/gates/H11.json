@@ -1,0 +1,10 @@
+{
+  "id": "H11",
+  "kind": "task",
+  "set": "pilot",
+  "title": "Delivery jobs have known bounds",
+  "doneWhen": "A test proves the transport options. The measurement is in `decisions.tsv`.",
+  "check": {
+    "type": "pending"
+  }
+}

@@ -2,37 +2,53 @@ import assert from "node:assert/strict";
 import { before, describe, it, mock } from "node:test";
 import { renderToString } from "react-dom/server";
 import type { ReactNode } from "react";
-import type { StudentNextStepResult } from "@/lib/progression/student-next-step";
-import {
-  createStudentAlertStore,
-  makePreloadedReadiness,
-  STUDENT_ID,
-} from "@/lib/student-alerts.test-support";
+import { createStudentAlertStore, STUDENT_ID } from "@/lib/student-alerts.test-support";
 
 // Node does not process CSS modules; the browser harness verifies their real styles.
 mock.module("@/components/dashboard/dashboard.module.css", { defaultExport: { workspace: "workspace" } });
 
-// How many intake FormSubmission rows the student has. Mutable so a test can
-// drive the signature banner's branch; 0 = the banner shows.
-let intakeSubmissionCount = 0;
 
 // Module mocks, registered before the page is imported. Every read not under
 // test returns the quietest value that keeps the page off the welcome redirect
-// (one goal, orientation complete).
+// (one goal, orientation complete). The page reads through
+// loadStudentDashboard, which runs most reads in transactions, so the same
+// fake answers both the client and a transaction.
+const zero = async () => 0;
+const none = async () => null;
+const prismaMock = {
+  goal: { count: async () => 1, findFirst: none },
+  progression: { findUnique: none },
+  orientationProgress: { count: async () => 1 },
+  orientationItem: { count: async () => 1, findMany: async () => [] },
+  certification: { count: zero, findMany: async () => [] },
+  certTemplate: { findMany: async () => [] },
+  portfolioItem: { count: zero },
+  resumeData: { findUnique: none },
+  publicCredentialPage: { findUnique: none },
+  careerDiscovery: { findUnique: none },
+  message: { count: zero },
+  studentClassEnrollment: { findFirst: none },
+  studentSavedJob: { count: zero },
+  application: { count: zero },
+  appointment: { findFirst: none },
+  studentTask: { findMany: async () => [], count: zero },
+  studentAlert: createStudentAlertStore(),
+  // R5: the dashboard reads no intake form submissions. A read here fails the
+  // render. (The education plan's findFirst is the overview's, not intake.)
+  formSubmission: {
+    count: async () => { throw new Error("the dashboard must not read intake form submissions"); },
+    findFirst: none,
+  },
+  // The SMS re-consent notice reads the student's own preference row.
+  // Null = never set one up, which is the case for this fixture and for
+  // most students; the notice renders for nobody here.
+  notificationPreference: { findUnique: none },
+};
 mock.module("@/lib/db", {
   namedExports: {
-    prisma: {
-      goal: { count: async () => 1 },
-      appointment: { findFirst: async () => null },
-      studentTask: { findMany: async () => [] },
-      studentAlert: createStudentAlertStore(),
-      orientationItem: { findMany: async () => [] },
-      formSubmission: { count: async () => intakeSubmissionCount },
-      // The SMS re-consent notice reads the student's own preference row.
-      // Null = never set one up, which is the case for this fixture and for
-      // most students; the notice renders for nobody here.
-      notificationPreference: { findUnique: async () => null },
-    },
+    prisma: prismaMock,
+    withAppTransaction: async <T,>(work: (tx: typeof prismaMock) => Promise<T>) => work(prismaMock),
+    withAppReadTransaction: async <T,>(work: (tx: typeof prismaMock) => Promise<T>) => work(prismaMock),
   },
 });
 
@@ -47,39 +63,16 @@ mock.module("@/lib/auth", {
   },
 });
 
-mock.module("@/lib/progression/fetch-readiness-data", {
-  namedExports: { fetchStudentReadinessData: async () => makePreloadedReadiness() },
-});
-
 mock.module("@/lib/sage/panel-data", {
   namedExports: { getLatestPanelSpec: async () => null },
 });
 
-const nextStep: StudentNextStepResult = {
-  currentStepKey: "followUp",
-  title: "Keep your applications moving",
-  description: "",
-  whyItMatters: "",
-  actionLabel: "View Career Hub",
-  actionLink: "/career",
-  steps: [],
-};
-
-mock.module("@/lib/progression/student-next-step", {
-  namedExports: {
-    getStudentNextStep: async () => nextStep,
-    nextStepShortLabel: () => null,
-  },
-});
-
 // Renders only the intro slot: the header and signature banner the page passes in.
-mock.module("./DashboardClient", { defaultExport: (props: { initialSupport?: { alertCount: number }; intro?: ReactNode }) => {
+interface ClientProps { initialSupport?: { alertCount: number }; initialOverview?: unknown; initialActivity?: unknown; intro?: ReactNode }
+mock.module("./DashboardClient", { defaultExport: (props: ClientProps) => {
   if (props.initialSupport) ambientRenders.push(props.initialSupport);
+  clientRenders.push(props);
   return props.intro ?? null;
-} });
-mock.module("@/lib/dashboard/readers", { namedExports: {
-  readOverview: async () => ({ outcomes: [], fetchedAt: new Date().toISOString() }),
-  readActivity: async () => ({ statuses: [], completions: [], unknownCompletionDates: 0, fetchedAt: new Date().toISOString() }),
 } });
 mock.module("@/lib/dashboard/tasks", { namedExports: {
   readTasks: async () => ({ tasks: [], total: 0, page: 1, pageSize: 10, fetchedAt: new Date().toISOString() }),
@@ -92,6 +85,7 @@ mock.module("@/components/progression/PathToEmployment", {
 });
 
 const ambientRenders: Array<{ alertCount: number }> = [];
+const clientRenders: ClientProps[] = [];
 
 let DashboardPage: typeof import("./page").default;
 
@@ -109,33 +103,64 @@ describe("DashboardPage alert count", () => {
   });
 });
 
-describe("DashboardPage intake signature banner", () => {
-  it("prompts the student when no intake submission exists yet", async () => {
-    intakeSubmissionCount = 0;
+describe("DashboardPage signed-form banner (R5)", () => {
+  // No page a student can open is able to sign the Student Profile form, so a
+  // banner asking for it could never be cleared. The instructor roster carries
+  // the "Missing intake" signal instead.
+  it("shows no signed-form banner to any student", async () => {
     const html = renderToString(await DashboardPage());
 
-    assert.match(html, /Sign Your Student Profile Form/);
-    assert.match(html, /Your class hours only count once your signed form is on file\./);
+    assert.doesNotMatch(html, /Sign Your Student Profile Form/);
+    assert.doesNotMatch(html, /class hours only count/i);
+    assert.doesNotMatch(html, /Student profile signature/);
   });
 
-  it("sends a signed-in student to the authenticated orientation flow, never the anonymous intake form", async () => {
-    intakeSubmissionCount = 0;
+  it("never sends a signed-in student to the anonymous intake form", async () => {
     const html = renderToString(await DashboardPage());
 
-    assert.match(html, /href="\/orientation"/);
-    // /intake is the public QR-code enrollment form. An authenticated student
-    // must never be routed to it: it collects the identity they already have,
-    // and it is the surface that used to hand out sessions.
+    // /intake is the public QR-code enrollment form. It collects the identity
+    // the student already has, and it is the surface that used to hand out sessions.
     assert.doesNotMatch(html, /href="\/intake"/);
   });
+});
 
-  it("hides the banner once an intake submission is on file", async () => {
-    intakeSubmissionCount = 1;
+// W2: one region's failed read shows that region's "could not load" fallback
+// (DashboardClient, given no initial data); it never fails the whole page.
+describe("DashboardPage when one region's read fails", () => {
+  async function renderWith<K extends keyof typeof prismaMock>(model: K, failing: typeof prismaMock[K]) {
+    const original = prismaMock[model];
+    prismaMock[model] = failing;
     try {
-      const html = renderToString(await DashboardPage());
-      assert.doesNotMatch(html, /Sign Your Student Profile Form/);
+      renderToString(await DashboardPage());
     } finally {
-      intakeSubmissionCount = 0;
+      prismaMock[model] = original;
     }
+    const props = clientRenders.at(-1);
+    assert.ok(props, "DashboardClient was not rendered");
+    return props;
+  }
+  const fail = async () => { throw new Error("read failed"); };
+
+  it("a rejected overview read still renders the page with the other regions", async () => {
+    const props = await renderWith("certTemplate", { findMany: fail });
+    assert.equal(props.initialOverview, undefined);
+    assert.notEqual(props.initialActivity, undefined);
+    assert.notEqual(props.initialSupport, undefined);
+  });
+
+  it("rejected alert counts leave the advising region to its fallback and keep the others", async () => {
+    const store = createStudentAlertStore();
+    const count = mock.fn(async (_args: Parameters<typeof store.count>[0]): Promise<number> => fail());
+    const props = await renderWith("studentAlert", { findMany: store.findMany, count });
+    assert.equal(props.initialSupport, undefined);
+    assert.notEqual(props.initialOverview, undefined);
+    assert.notEqual(props.initialActivity, undefined);
+  });
+
+  it("a rejected live read still renders the page, every region on its fallback", async () => {
+    const props = await renderWith("studentSavedJob", { count: fail });
+    assert.equal(props.initialSupport, undefined);
+    assert.equal(props.initialOverview, undefined);
+    assert.equal(props.initialActivity, undefined);
   });
 });

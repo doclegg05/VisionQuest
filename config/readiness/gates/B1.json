@@ -5,6 +5,35 @@
   "title": "Regions screen",
   "doneWhen": "Component tests pass. A CI e2e test has an admin on an empty system create a region and then a class.",
   "check": {
-    "type": "pending"
+    "type": "test",
+    "files": [
+      "src/components/admin/regions-model.test.ts",
+      "src/components/admin/regions-api.test.ts",
+      "src/components/admin/regions-reducer.test.ts",
+      "src/components/admin/regions-controller.test.ts",
+      "src/components/admin/regions-copy.test.ts",
+      "src/components/admin/class-region-choice.test.ts",
+      "src/components/admin/RegionsCardView.test.tsx",
+      "src/components/admin/RegionsCard.test.tsx",
+      "src/components/admin/ClassRegionField.test.tsx",
+      "src/components/admin/region-messages.test.tsx",
+      "src/components/admin/regions-events.test.ts",
+      "src/components/admin/region-pick.test.ts",
+      "src/components/admin/class-regions.test.ts",
+      "src/components/admin/NoRegionsHint.test.tsx",
+      "src/components/admin/CreateClassRegionSelect.test.tsx",
+      "src/components/admin/region-forms.test.tsx",
+      "src/components/admin/focus-after-remove.test.ts",
+      "src/components/staff/StaffInvitePanel.test.tsx",
+      "src/components/staff/OrgPlacementPanel.test.tsx",
+      "src/app/api/admin/regions/regions-routes.test.ts",
+      "src/app/api/teacher/classes/class-region-fields.test.ts",
+      "src/app/api/coordinator/reports/monthly/monthly-region-name.test.ts",
+      "src/components/staff/invite-roles.test.tsx",
+      "src/app/api/teacher/classes/class-route-auth.test.ts",
+      "src/app/api/teacher/classes/[id]/route.test.ts",
+      "src/components/teacher/CreateClassForm.test.tsx",
+      "src/components/teacher/class-refusals.test.ts"
+    ]
   }
 }

@@ -1,15 +1,15 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { getRoleHomePath } from "@/lib/role-home";
-import { prisma } from "@/lib/db";
 import { parseState, createInitialState } from "@/lib/progression/engine";
 import { computeNavPhase, type NavPhase } from "@/lib/nav-progression";
-import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
+import { readPageShell } from "@/lib/dashboard/signals";
+import { readRecoveryQuestionKeys, readSageNoticeAcknowledged } from "@/lib/dashboard/student-gates";
 import { needsRecoverySetup } from "@/lib/security-questions";
+import { needsSageNotice, SAGE_NOTICE_ACK_PATH, SAGE_NOTICE_VERSION } from "@/lib/about-sage/notice";
 import NavBar from "@/components/ui/NavBar";
 import NotificationProvider from "@/components/ui/NotificationProvider";
 import ProgressionProvider from "@/components/progression/ProgressionProvider";
-import { PageTransition } from "@/components/ui/PageTransition";
 import { DemoAccountProvider } from "@/components/demo/DemoAccountContext";
 
 export default async function StudentLayout({
@@ -27,16 +27,23 @@ export default async function StudentLayout({
     redirect(getRoleHomePath(session.role));
   }
 
-  // Lightweight fetch for nav phase (cached by Next.js request dedup)
-  const [goalCount, progression, orientationDone, securityKeys] = await Promise.all([
-    prisma.goal.count({ where: { studentId: session.id, status: { in: [...GOAL_PLANNING_STATUSES] } } }),
-    prisma.progression.findUnique({ where: { studentId: session.id }, select: { state: true } }),
-    prisma.orientationProgress.count({ where: { studentId: session.id, completed: true } }),
-    prisma.securityQuestionAnswer.findMany({
-      where: { studentId: session.id },
-      select: { questionKey: true },
-    }),
+  // The nav phase's three facts, read fresh on every page load and shared with
+  // the dashboard page in the same request (readPageShell); polls get the kept copy.
+  const [shell, securityKeys, noticeAcknowledged] = await Promise.all([
+    readPageShell(session),
+    // Both gates are read every request until satisfied, then kept.
+    readRecoveryQuestionKeys(session),
+    readSageNoticeAcknowledged(session, SAGE_NOTICE_VERSION),
   ]);
+
+  // One-time Sage notice gate (H6): a student reads what Sage keeps and who
+  // can see it before using the app, and again whenever the notice's version
+  // changes. It comes after the forced password change (src/proxy.ts holds
+  // that session before any page renders) and before the recovery questions.
+  // The notice page is outside this group, so the redirect cannot loop.
+  if (needsSageNotice({ demoAccount: session.demoAccount, acknowledged: noticeAcknowledged })) {
+    redirect(SAGE_NOTICE_ACK_PATH);
+  }
 
   // One-time recovery gate: staff-created accounts have no recovery questions,
   // so a forgotten password can lock a student out when SMTP is unconfigured.
@@ -45,15 +52,15 @@ export default async function StudentLayout({
   // password to forget, so they skip it.
   if (needsRecoverySetup({
     demoAccount: session.demoAccount,
-    questionKeys: securityKeys.map((k) => k.questionKey),
+    questionKeys: securityKeys,
   })) {
     redirect("/recovery-setup");
   }
 
-  const progState = progression ? parseState(progression.state) : createInitialState();
+  const progState = shell.progressionState ? parseState(shell.progressionState) : createInitialState();
   const navPhase: NavPhase = computeNavPhase({
-    hasGoals: goalCount > 0,
-    orientationStarted: orientationDone > 0,
+    hasGoals: shell.goalPlanningCount > 0,
+    orientationStarted: shell.orientationCompletedCount > 0,
     orientationComplete: progState.orientationComplete || false,
   });
 
@@ -69,9 +76,7 @@ export default async function StudentLayout({
               id="main-content"
               className="app-main min-h-screen overflow-y-auto pb-28 pt-20 md:ml-[19rem] md:pb-10 md:pr-5 md:pt-5"
             >
-              <PageTransition>
-                {children}
-              </PageTransition>
+              {children}
             </main>
           </ProgressionProvider>
         </div>

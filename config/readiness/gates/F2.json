@@ -5,6 +5,21 @@
   "title": "Dashboard read diet",
   "doneWhen": "M1 and M2 at target. A test proves a write clears the cache.",
   "check": {
-    "type": "pending"
+    "type": "test",
+    "files": [
+      "src/lib/dashboard/signals.write-through.test.ts",
+      "src/lib/dashboard/read-isolation.test.ts",
+      "src/app/(student)/dashboard/page.test.tsx",
+      "src/lib/dashboard/student-dashboard.test.ts",
+      "src/lib/dashboard/student-cache.test.ts",
+      "src/lib/dashboard/globals.test.ts",
+      "src/lib/dashboard/query.test.ts",
+      "src/app/(student)/layout.test.tsx",
+      "src/lib/readiness/dashboard-query-count.test.tsx",
+      "src/lib/readiness/dashboard-idle-query-count.test.ts",
+      "src/lib/class-enrollment-status.test.ts",
+      "src/lib/chat-context-write-through.test.ts",
+      "src/lib/db.admin-write-through.test.ts"
+    ]
   }
 }

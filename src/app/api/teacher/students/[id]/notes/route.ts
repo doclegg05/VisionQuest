@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { withTeacherAuth } from "@/lib/api-error";
 import { isNoteCategory } from "@/lib/advising";
-import { logAuditEvent } from "@/lib/audit";
+import { logAuditEvent, recordStudentView } from "@/lib/audit";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 
@@ -113,6 +113,13 @@ export const GET = withTeacherAuth(async (
   const hasNextPage = notes.length > limit;
   const page = hasNextPage ? notes.slice(0, limit) : notes;
   const nextCursor = hasNextPage ? page[page.length - 1].id : null;
+
+  await recordStudentView({
+    actorId: session.id,
+    actorRole: session.role,
+    targetStudentId: studentId,
+    surface: "notes",
+  });
 
   return NextResponse.json({ notes: page, nextCursor });
 });

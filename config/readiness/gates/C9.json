@@ -1,0 +1,14 @@
+{
+  "id": "C9",
+  "kind": "task",
+  "set": "launch",
+  "title": "Alert audit and conflict checks (delivered with C11)",
+  "doneWhen": "Route tests: an audit row per action, and 409 when the status has changed.",
+  "check": {
+    "type": "test",
+    "files": [
+      "src/app/api/teacher/alerts/[id]/route.test.ts",
+      "src/components/teacher/queue-undo.conflict.test.ts"
+    ]
+  }
+}

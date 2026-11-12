@@ -1,13 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { api, apiFetch } from "@/lib/api";
 import { FormDialog } from "@/components/ui/FormDialog";
+import { useConfirm } from "@/components/ui/useConfirm";
 import type { InterventionQueueEntry } from "@/lib/teacher/intervention-queue";
 import {
   buildQueueSageMessage,
-  countInactivityStages,
   groupQueueIssues,
   QUEUE_ROWS_SHOWN,
   queueBodyView,
@@ -16,9 +16,16 @@ import {
   type QueueIssueGroup,
 } from "@/lib/teacher/queue-issue-groups";
 import DashboardActionPanel, { type DashboardActionIntent } from "./DashboardActionPanel";
+import { InterventionQueueHeader } from "./InterventionQueueHeader";
 import { buildAlertActionIntent, mainActionMode } from "./queue-actions";
 import { QueueStudentRow } from "./QueueStudentRow";
 import type { QueueAlertAction } from "./QueueRowIssues";
+import { QueueUndoLineContext } from "./queue-undo-context";
+import { QueueUndoActionContext } from "./queue-undo-action-context";
+import { QUEUE_STATUS_ID, type QueueReloadHooks } from "./queue-undo";
+import { findAlertTarget } from "./queue-alert-target";
+import { runQueueLoad } from "./queue-reload";
+import { useQueueUndo } from "./useQueueUndo";
 import type { InterventionQueueResponse as QueueResponse } from "@/lib/teacher/dashboard";
 
 // ─── Loading Skeleton ─────────────────────────────────────────────────────────
@@ -431,39 +438,48 @@ export default function InterventionQueuePanel({
 
   /**
    * Loads the queue. Returns the loaded rows, or null when the load failed. A request that a newer one replaced
-   * still returns what it got, but changes no state.
+   * still returns what it got, but changes no state. `reload` is the Undo flow's side of the load: runQueueLoad
+   * takes its token before the request leaves, and only the newest load that worked reports back with it.
    */
-  const fetchQueue = useCallback(async (): Promise<InterventionQueueEntry[] | null> => {
+  const fetchQueue = useCallback(async (reload: QueueReloadHooks): Promise<InterventionQueueEntry[] | null> => {
     latestRequest.current += 1;
     const request = latestRequest.current;
-    const isLatest = () => request === latestRequest.current;
-    try {
-      const classIdNow = classIdRef.current;
-      const url = classIdNow
-        ? `/api/teacher/intervention-queue?classId=${encodeURIComponent(classIdNow)}`
-        : "/api/teacher/intervention-queue";
-      const data = await api.get<QueueResponse>(url);
-      if (isLatest()) {
-        setQueue(data.queue);
+    const classIdNow = classIdRef.current;
+    const url = classIdNow
+      ? `/api/teacher/intervention-queue?classId=${encodeURIComponent(classIdNow)}`
+      : "/api/teacher/intervention-queue";
+    return runQueueLoad({
+      reload,
+      isLatest: () => request === latestRequest.current,
+      fetchRows: async () => (await api.get<QueueResponse>(url)).queue,
+      show: (rows) => {
+        setQueue(rows);
         setError(null);
-      }
-      return data.queue;
-    } catch {
-      if (isLatest()) setError("Could not load the intervention queue.");
-      return null;
-    } finally {
-      if (isLatest()) setLoading(false);
-    }
+        setLoading(false);
+      },
+      fail: () => {
+        setError("Could not load the intervention queue.");
+        setLoading(false);
+      },
+    });
   }, []);
+
+  const { confirm, confirmDialog } = useConfirm();
+  const alertUndo = useQueueUndo({ confirm, load: fetchQueue });
+  // Every reload of the queue goes through the Undo flow, so each load reports to it.
+  const { refresh: refreshQueue, clear: clearUndo } = alertUndo;
+
+  // A class change shows other rows, so every done line and the Undo offer end with it.
+  useLayoutEffect(() => clearUndo(), [classId, clearUndo]);
 
   useEffect(() => {
     // The server-provided queue stands in for the first view with no class chosen. Any later class change, including
     // a switch back to all classes, needs a fetch.
     if (initialQueue !== undefined && !classId && !classSwitched) return;
     void (async () => {
-      await fetchQueue();
+      await refreshQueue();
     })();
-  }, [initialQueue, fetchQueue, classId, classSwitched]);
+  }, [initialQueue, refreshQueue, classId, classSwitched]);
 
   // The row with an open action panel stays on screen even when finishing the action drops it out of the first view.
   const openPanelStudentId = actionIntent?.student.id ?? null;
@@ -476,27 +492,15 @@ export default function InterventionQueuePanel({
   // shown above the list so the teacher still sees how their action ended.
   const panelHasNoRow =
     actionIntent !== null && !(listShown && queue.some((student) => student.studentId === openPanelStudentId));
-  const urgentCount = queue.filter((student) => student.signals.highSeverityAlertCount > 0).length;
-  const inactivityStages = useMemo(() => countInactivityStages(queue), [queue]);
+  const statusText = actionMessage ?? alertUndo.status?.text ?? "";
 
-  async function handleAlertAction(alertId: string, action: QueueAlertAction) {
-    setActionMessage(null);
-    try {
-      await api.patch(`/api/teacher/alerts/${alertId}`, {
-        action,
-        ...(action === "snooze" ? { hours: 24 } : {}),
-      });
-      setActionMessage(
-        action === "snooze"
-          ? "Snoozed for 24 hours."
-          : action === "resolve"
-            ? "Marked resolved."
-            : "Dismissed.",
-      );
-      await fetchQueue();
-    } catch {
-      setActionMessage("Could not update that issue. Try again.");
-    }
+  /**
+   * Resolved and Dismiss save at once and offer Undo in the alert's line until the next action or reload. Snooze
+   * reloads the queue. A critical alert asks first for all three. While a request is out the flow ignores the tap,
+   * and an ignored tap must not clear the status line.
+   */
+  function handleAlertAction(alertId: string, action: QueueAlertAction) {
+    if (alertUndo.act(findAlertTarget(queue, alertId), action)) setActionMessage(null);
   }
 
   /**
@@ -506,7 +510,7 @@ export default function InterventionQueuePanel({
    */
   async function handlePanelChanged(intent: DashboardActionIntent) {
     setActionMessage(`Saved for ${intent.student.displayName}.`);
-    const loaded = await fetchQueue();
+    const loaded = await refreshQueue();
     const stillQueued = loaded?.some((student) => student.studentId === intent.student.id) ?? false;
     if (!stillQueued) setActionIntent((open) => (open === intent ? null : open));
   }
@@ -537,39 +541,30 @@ export default function InterventionQueuePanel({
 
   return (
     <section className="surface-section p-5">
-      {/* Header */}
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-success">
-            Needs attention
-          </p>
-          <h2 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">Intervention Queue</h2>
-          {listShown ? (
-            <p className="mt-1 text-sm text-[var(--ink-muted)]">
-              {queue.length} student{queue.length === 1 ? "" : "s"} need follow-up
-              {urgentCount > 0 ? ` · ${urgentCount} urgent` : ""}
-            </p>
-          ) : null}
-          {inactivityStages.length > 0 ? (
-            <p className="mt-0.5 text-xs text-[var(--ink-muted)]">
-              Inactive: {inactivityStages.map((stage) => `${stage.label} ${stage.count}`).join(" · ")}
-            </p>
-          ) : null}
-        </div>
-        {listShown ? (
-          <button
-            type="button"
-            onClick={askSageToPrioritize}
-            className="inline-flex min-h-11 items-center rounded-full bg-[var(--accent-strong)] px-4 text-xs font-semibold text-[var(--on-accent)] transition-colors hover:bg-[var(--accent-green)]/90"
-          >
-            Ask Sage to prioritize
-          </button>
-        ) : null}
-      </div>
+      <InterventionQueueHeader
+        queue={queue}
+        listShown={listShown}
+        isDone={alertUndo.isDone}
+        refreshOffered={alertUndo.hasDone}
+        onRefresh={alertUndo.refreshList}
+        onAskSage={askSageToPrioritize}
+      >
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-success">
+          Needs attention
+        </p>
+        <h2 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">Intervention Queue</h2>
+      </InterventionQueueHeader>
 
-      <p role="status" className={actionMessage ? "mb-3 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2 text-xs text-[var(--ink-muted)]" : "sr-only"}>
-        {actionMessage ?? ""}
+      {/* Takes focus when an acted on line leaves the screen, so focus never falls to the page. */}
+      <p id={QUEUE_STATUS_ID} tabIndex={-1} role="status" className={statusText ? "mb-3 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2 text-xs text-[var(--ink-muted)]" : "sr-only"}>
+        {statusText}
       </p>
+
+      {alertUndo.failure ? (
+        <p key={alertUndo.failure.id} role="alert" className="mb-3 rounded-xl border border-danger bg-[var(--surface-muted)] px-3 py-2 text-xs font-medium text-danger">
+          {alertUndo.failure.text}
+        </p>
+      ) : null}
 
       {panelHasNoRow && actionIntent ? (
         <div className="mb-3">
@@ -608,7 +603,7 @@ export default function InterventionQueuePanel({
               </p>
               <button
                 type="button"
-                onClick={() => void fetchQueue()}
+                onClick={() => void refreshQueue()}
                 aria-label="Try again to load the intervention queue"
                 className="inline-flex min-h-11 items-center rounded-full border border-[var(--border)] px-4 text-sm font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-raised)]"
               >
@@ -616,31 +611,35 @@ export default function InterventionQueuePanel({
               </button>
             </div>
           ) : null}
-          <ul className="space-y-2">
-            {visible.map((student) => (
-              <QueueStudentRow
-                key={student.studentId}
-                student={student}
-                now={now}
-                actionPanel={
-                  actionIntent?.student.id === student.studentId ? (
-                    <InlineActionPanel
-                      intent={actionIntent}
-                      onClose={() => setActionIntent(null)}
-                      onChanged={() => handlePanelChanged(actionIntent)}
-                    />
-                  ) : null
-                }
-                onMainAction={handleMainAction}
-                onQuickAction={handleQuickAction}
-                onAlertAction={(alertId, action) => void handleAlertAction(alertId, action)}
-                onQuickTask={(row) => setTaskTarget(targetOf(row))}
-                onQuickNote={(row) => setNoteTarget(targetOf(row))}
-                onSchedule={(row) => setScheduleTarget(targetOf(row))}
-                onAskSage={askSage}
-              />
-            ))}
-          </ul>
+          <QueueUndoActionContext.Provider value={alertUndo.undo}>
+            <QueueUndoLineContext.Provider value={alertUndo.lineState}>
+              <ul className="space-y-2">
+                {visible.map((student) => (
+                  <QueueStudentRow
+                    key={student.studentId}
+                    student={student}
+                    now={now}
+                    actionPanel={
+                      actionIntent?.student.id === student.studentId ? (
+                        <InlineActionPanel
+                          intent={actionIntent}
+                          onClose={() => setActionIntent(null)}
+                          onChanged={() => handlePanelChanged(actionIntent)}
+                        />
+                      ) : null
+                    }
+                    onMainAction={handleMainAction}
+                    onQuickAction={handleQuickAction}
+                    onAlertAction={handleAlertAction}
+                    onQuickTask={(row) => setTaskTarget(targetOf(row))}
+                    onQuickNote={(row) => setNoteTarget(targetOf(row))}
+                    onSchedule={(row) => setScheduleTarget(targetOf(row))}
+                    onAskSage={askSage}
+                  />
+                ))}
+              </ul>
+            </QueueUndoLineContext.Provider>
+          </QueueUndoActionContext.Provider>
           {hiddenCount > 0 ? (
             <button
               type="button"
@@ -667,7 +666,7 @@ export default function InterventionQueuePanel({
           studentId={taskTarget.studentId}
           studentName={taskTarget.name}
           onClose={() => setTaskTarget(null)}
-          onCreated={() => void fetchQueue()}
+          onCreated={() => void refreshQueue()}
         />
       )}
 
@@ -676,7 +675,7 @@ export default function InterventionQueuePanel({
           studentId={noteTarget.studentId}
           studentName={noteTarget.name}
           onClose={() => setNoteTarget(null)}
-          onCreated={() => void fetchQueue()}
+          onCreated={() => void refreshQueue()}
         />
       )}
 
@@ -685,9 +684,11 @@ export default function InterventionQueuePanel({
           studentId={scheduleTarget.studentId}
           studentName={scheduleTarget.name}
           onClose={() => setScheduleTarget(null)}
-          onCreated={() => void fetchQueue()}
+          onCreated={() => void refreshQueue()}
         />
       )}
+
+      {confirmDialog}
     </section>
   );
 }

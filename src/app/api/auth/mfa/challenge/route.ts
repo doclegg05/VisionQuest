@@ -7,7 +7,7 @@ import {
   getMfaSessionToken,
   clearMfaSessionCookie,
 } from "@/lib/auth";
-import { clientIpBucket } from "@/lib/client-ip";
+import { clientIpAddress, clientIpBucket } from "@/lib/client-ip";
 import { rateLimit } from "@/lib/rate-limit";
 import { logAuditEvent } from "@/lib/audit";
 import { withErrorHandler } from "@/lib/api-error";
@@ -15,6 +15,7 @@ import { parseBody } from "@/lib/schemas";
 import { claimBackupCode, claimTotpCounter, verifyTotp } from "@/lib/mfa";
 import { logger } from "@/lib/logger";
 import { studentLogKey } from "@/lib/log-keys";
+import { passwordChangeRequired } from "@/lib/password-change-gate";
 
 const mfaChallengeSchema = z.object({
   token: z.string().min(6, "MFA code is required.").max(32, "MFA code is too long."),
@@ -22,6 +23,14 @@ const mfaChallengeSchema = z.object({
   // clients rely on the httpOnly cookie set at login time.
   mfaSessionToken: z.string().optional(),
 });
+
+/**
+ * Challenges per network address per window, passed or failed. 30 fits an
+ * office of staff on one address: at 5 the sixth to sign in was refused.
+ * The per-account limit below is the control.
+ */
+const NETWORK_LIMIT_ATTEMPTS = 30;
+const NETWORK_LIMIT_WINDOW_MS = 5 * 60 * 1000;
 
 /**
  * Per-account bounds, matching login's per-user limit (login/route.ts). The
@@ -43,10 +52,9 @@ const ACCOUNT_LOCKED_MESSAGE =
  * real session JWT cookie.
  */
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const ip = clientIpBucket(req);
+  const ip = clientIpAddress(req);
 
-  // Rate limit MFA challenge attempts (5 attempts per 5 minutes per IP)
-  const rl = await rateLimit(`mfa-challenge:${ip}`, 5, 5 * 60 * 1000);
+  const rl = await rateLimit(`mfa-challenge:${clientIpBucket(req)}`, NETWORK_LIMIT_ATTEMPTS, NETWORK_LIMIT_WINDOW_MS);
   if (!rl.success) {
     return NextResponse.json(
       { error: "Too many MFA attempts. Please try again later." },
@@ -123,7 +131,11 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       mfaSecret: true,
       mfaBackupCodes: true,
       mfaLastUsedCounter: true,
+      // The next three decide whether the session is held to the
+      // change-password screen (passwordChangeRequired below).
       mustChangePassword: true,
+      passwordHash: true,
+      demoAccount: true,
     },
   });
 
@@ -166,7 +178,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       action: "mfa.challenge_failed",
       targetType: "student",
       targetId: student.id,
-      summary: `MFA challenge failed for ${student.studentId}.`,
+      summary: `MFA challenge failed.`,
       metadata: { ip },
     });
 
@@ -177,7 +189,10 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     ? backupClaim.remaining.length
     : student.mfaBackupCodes.length;
 
-  await setSessionCookie(student.id, student.role, student.sessionVersion);
+  // Same rule as the sign-in route: a student whose password staff set is
+  // signed in and held to the change-password screen (src/proxy.ts).
+  const mustChangePassword = passwordChangeRequired(student);
+  await setSessionCookie(student.id, student.role, student.sessionVersion, { mustChangePassword });
   // Single-use cookie — clear once the real session is issued.
   await clearMfaSessionCookie();
 
@@ -187,7 +202,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     action: "mfa.challenge_success",
     targetType: "student",
     targetId: student.id,
-    summary: `MFA challenge passed for ${student.studentId}.`,
+    summary: `MFA challenge passed.`,
     metadata: {
       ip,
       method: usedBackupCode ? "backup_code" : "totp",
@@ -202,9 +217,9 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       studentId: student.studentId,
       displayName: student.studentId, // Minimal — matches login response shape
       role: student.role,
-      // Same contract as the login response: a client-side prompt to rotate a
-      // password staff chose, never a gate on the session just issued.
-      mustChangePassword: student.mustChangePassword,
+      // Same contract as the login response: for a client that wants to go
+      // straight to the change screen. The proxy holds the session regardless.
+      mustChangePassword,
     },
   });
 });

@@ -15,23 +15,28 @@ interface ClaimedRow {
   attempts: number;
 }
 
+// processJobs runs the lease reaper (its SQL carries a marker comment)
+// before its claim; it finds nothing to take back in these tests.
 function stubQueryRaw(rows: ClaimedRow[]) {
   const original = prisma.$queryRaw;
-  (prisma.$queryRaw as unknown as (...args: unknown[]) => Promise<ClaimedRow[]>) = async () => rows;
+  (prisma.$queryRaw as unknown as (query: { strings?: readonly string[] }) => Promise<ClaimedRow[]>) = async (query) =>
+    (query.strings ?? []).join("").includes("reap-expired-leases") ? [] : rows;
   return () => {
     prisma.$queryRaw = original;
   };
 }
 
 // The processor writes a job's result with updateMany, guarded by its claim
-// (jobs.lease.test.ts); count 1 means the claim still held the row.
+// (jobs.lease.test.ts); count 1 means the claim still held the row. It also
+// renews the lease with updateMany as each job starts, a write with no
+// status; `calls` keeps the result writes only.
 function stubBackgroundJobUpdateMany() {
   const calls: UpdateManyArgs[] = [];
   const original = prisma.backgroundJob.updateMany;
   (prisma.backgroundJob.updateMany as unknown as (args: UpdateManyArgs) => Promise<unknown>) = async (
     args: UpdateManyArgs,
   ) => {
-    calls.push(args);
+    if ("status" in args.data) calls.push(args);
     return { count: 1 };
   };
   return {

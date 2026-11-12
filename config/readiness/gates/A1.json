@@ -5,6 +5,15 @@
   "title": "Classroom-safe sign-in limits",
   "doneWhen": "A test signs in 30 accounts from one address inside one window and all succeed. The per-account lock test still passes. CI `test:ratelimit` is green.",
   "check": {
-    "type": "pending"
+    "type": "test",
+    "files": [
+      "src/app/api/auth/login/__tests__/route.classroom.test.ts",
+      "src/app/api/auth/login/__tests__/route.test.ts",
+      "src/app/api/auth/login/__tests__/route.concurrency.test.ts",
+      "src/app/api/auth/reset-password/questions/__tests__/route.test.ts",
+      "src/app/api/auth/reset-password/__tests__/route.test.ts",
+      "src/app/api/auth/mfa/challenge/__tests__/route.test.ts",
+      "src/app/api/intake/submit/route.test.ts"
+    ]
   }
 }

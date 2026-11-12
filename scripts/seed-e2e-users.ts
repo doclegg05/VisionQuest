@@ -47,6 +47,7 @@ import {
   E2E_TEACHER,
 } from "../e2e/fixtures";
 import { resetStudentToDayOne } from "../e2e/helpers/db";
+import { acknowledgeSageNoticeForFixture } from "../src/lib/about-sage/notice-fixture";
 import { assertSafeE2eSeedTarget } from "../src/lib/e2e-seed-guard";
 
 // Already-set process env always wins over .env.local — @next/env never
@@ -176,7 +177,7 @@ async function main() {
       update: {
         email: E2E_TEACHER.email,
         displayName: E2E_TEACHER.displayName,
-        passwordHash: hashPassword(E2E_TEACHER.password).hash,
+        passwordHash: (await hashPassword(E2E_TEACHER.password)).hash,
         role: "teacher",
         isActive: true,
       },
@@ -184,7 +185,7 @@ async function main() {
         studentId: E2E_TEACHER.login,
         email: E2E_TEACHER.email,
         displayName: E2E_TEACHER.displayName,
-        passwordHash: hashPassword(E2E_TEACHER.password).hash,
+        passwordHash: (await hashPassword(E2E_TEACHER.password)).hash,
         role: "teacher",
       },
     });
@@ -194,15 +195,18 @@ async function main() {
       update: {
         email: E2E_STUDENT.email,
         displayName: E2E_STUDENT.displayName,
-        passwordHash: hashPassword(E2E_STUDENT.password).hash,
+        passwordHash: (await hashPassword(E2E_STUDENT.password)).hash,
         role: "student",
         isActive: true,
+        // A long-lived database where staff once reset this account would
+        // otherwise keep it held to the change-password screen (readiness A3).
+        mustChangePassword: false,
       },
       create: {
         studentId: E2E_STUDENT.login,
         email: E2E_STUDENT.email,
         displayName: E2E_STUDENT.displayName,
-        passwordHash: hashPassword(E2E_STUDENT.password).hash,
+        passwordHash: (await hashPassword(E2E_STUDENT.password)).hash,
       },
     });
 
@@ -211,15 +215,18 @@ async function main() {
       update: {
         email: E2E_JOURNEY_STUDENT.email,
         displayName: E2E_JOURNEY_STUDENT.displayName,
-        passwordHash: hashPassword(E2E_JOURNEY_STUDENT.password).hash,
+        passwordHash: (await hashPassword(E2E_JOURNEY_STUDENT.password)).hash,
         role: "student",
         isActive: true,
+        // A long-lived database where staff once reset this account would
+        // otherwise keep it held to the change-password screen (readiness A3).
+        mustChangePassword: false,
       },
       create: {
         studentId: E2E_JOURNEY_STUDENT.login,
         email: E2E_JOURNEY_STUDENT.email,
         displayName: E2E_JOURNEY_STUDENT.displayName,
-        passwordHash: hashPassword(E2E_JOURNEY_STUDENT.password).hash,
+        passwordHash: (await hashPassword(E2E_JOURNEY_STUDENT.password)).hash,
       },
     });
 
@@ -228,7 +235,7 @@ async function main() {
     // when the 3-question recovery set is missing, so seeded users need a
     // configured set or every authenticated spec bounces there. Hashed with
     // the real helper (scrypt over the normalized answer).
-    const recoveryAnswers = hashSecurityAnswers({
+    const recoveryAnswers = await hashSecurityAnswers({
       birth_city: "Testville",
       elementary_school: "Test Elementary",
       favorite_teacher: "Testy",
@@ -250,6 +257,12 @@ async function main() {
           },
         });
       }
+    }
+
+    // The student layout sends a student to /sage-notice until the current
+    // notice is acknowledged. Staff never see that gate.
+    for (const user of [student, journeyStudent]) {
+      await acknowledgeSageNoticeForFixture(prisma, user.id);
     }
 
     // ── Class + instructor + enrollments ─────────────────────────────────
@@ -387,16 +400,18 @@ async function main() {
     await resetStudentToDayOne(prisma, journeyStudent.id);
 
     // ── Login rate limits ────────────────────────────────────────────────
-    // /api/auth/login allows 10 attempts per IP per 15 min; repeated local
-    // suite runs from one machine would trip it. This seed only ever targets
-    // e2e databases (hermetic CI Postgres / dev), so reset login buckets.
+    // /api/auth/login allows 30 failed sign-ins per address and 5 per account
+    // per 15 min, and a sign-in that works gives its units back. Failed
+    // sign-ins left by earlier local suite runs from one machine would still
+    // trip it. This seed only ever targets e2e databases (hermetic CI
+    // Postgres / dev), so reset login buckets.
     //
     // `RateLimitEntry.key` holds a DERIVED key since 2026-09-06 —
     // `<family>:<digest>`, see src/lib/rate-limit-key.ts — but the family is
     // kept verbatim in front precisely so this prefix delete keeps working.
-    // It still clears both login families: `login:<ip>` and
-    // `login:user:<id>` (the per-account bucket, which is the binding one for
-    // the e2e collectors) both live under `login:`.
+    // It still clears every login bucket: `login:<ip>`, `login:user:<id>`
+    // (the per-account bucket) and `login:unknown:<digest>` all live under
+    // `login:`.
     const rl = await prisma.rateLimitEntry.deleteMany({
       where: { key: { startsWith: "login:" } },
     });

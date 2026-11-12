@@ -1,6 +1,7 @@
 "use client";
 
 import { useReducedMotion } from "framer-motion";
+import { WarningCircle } from "@phosphor-icons/react/dist/ssr";
 
 import { ReadAloudButton } from "@/components/ui/ReadAloudButton";
 
@@ -8,9 +9,13 @@ interface MessageBubbleProps {
   role: "user" | "assistant";
   content: string;
   isStreaming?: boolean;
+  /** A failure sentence from Sage: drawn with the house error icon. */
+  failed?: boolean;
+  /** An id for the text, so Try again can point at it with aria-describedby. */
+  textId?: string;
 }
 
-export default function MessageBubble({ role, content, isStreaming }: MessageBubbleProps) {
+export default function MessageBubble({ role, content, isStreaming, failed, textId }: MessageBubbleProps) {
   const isUser = role === "user";
   const shouldReduceMotion = useReducedMotion();
 
@@ -46,10 +51,19 @@ export default function MessageBubble({ role, content, isStreaming }: MessageBub
         // compiles to background-color which can't render gradients.
         style={isUser ? { background: "var(--chat-bubble-user-bg)" } : undefined}
       >
-        <p className="whitespace-pre-wrap break-words">
-          {content}
-          {isStreaming && shouldReduceMotion ? "…" : ""}
-        </p>
+        {failed ? (
+          <div className="flex items-start gap-2">
+            <WarningCircle size={20} weight="bold" aria-hidden="true" className="shrink-0" />
+            <p id={textId} className="min-w-0 whitespace-pre-wrap break-words">{content}</p>
+          </div>
+        ) : (
+          <p id={textId} className="whitespace-pre-wrap break-words">
+            {/* A reply stopped before any text is saved with a leading break
+                (sage-failure.ts savedCutOffReply); drop it on screen only. */}
+            {content.replace(/^\s+/, "")}
+            {isStreaming && shouldReduceMotion ? "…" : ""}
+          </p>
+        )}
         {/* Read-aloud lives on Sage's finished replies: an explain_job
             explanation reaches the student as Sage's own text, because
             ChatWindow renders a tool_result as a status chip (its summary) and

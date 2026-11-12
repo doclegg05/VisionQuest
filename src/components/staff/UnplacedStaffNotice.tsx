@@ -13,7 +13,7 @@ export function UnplacedStaffNotice() {
         description="Your account is set up. It is not placed in a region yet."
       />
       <p className="theme-card rounded-xl p-5 text-base text-[var(--ink-strong)]">
-        Ask your regional coordinator to invite you to your region.
+        Ask your program admin to add you to a region and a class. They do this on the Admin page, under Staff Waiting for a Region.
       </p>
     </div>
   );

@@ -8,6 +8,7 @@ import { logger } from "@/lib/logger";
 import { withAuth, forbidden, isStaffRole, type Session } from "@/lib/api-error";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { syncStudentAlerts } from "@/lib/advising";
+import { deferPerStudent } from "@/lib/after-response";
 import { safeUploadName } from "@/lib/upload-name";
 
 async function resolveTargetStudentId(session: Session, requestedStudentId?: string | null) {
@@ -100,7 +101,17 @@ export const POST = withAuth(async (session, req: NextRequest) => {
       },
     });
 
-    await syncStudentAlerts(targetStudentId);
+    if (isStaffRole(session.role)) {
+      // Staff upload: the instructor's queue must be fresh on their next fetch.
+      // eslint-disable-next-line no-restricted-syntax -- staff path awaits the sync on purpose
+      await syncStudentAlerts(targetStudentId);
+    } else {
+      // The student's upload is saved; the queue bookkeeping runs after the
+      // response (src/lib/after-response.ts).
+      deferPerStudent(targetStudentId, { surface: "forms/upload", effect: "syncStudentAlerts" }, () =>
+        syncStudentAlerts(targetStudentId),
+      );
+    }
 
     return NextResponse.json({ submission, fileId: fileRecord.id });
   } catch (error) {

@@ -9,13 +9,25 @@
  * on the client that received it. That is the unit the app pays for:
  * `src/lib/db.ts` wraps every app-client call in its own transaction.
  *
- * What it does not see: SQL. `relationLoads` is read from the call's
- * `select` / `include`, where Prisma's default strategy sends one more SELECT
- * per nested relation when the parent rows exist. It is derived, not observed.
+ * What it does not see: SQL. Nested relation loads are derived, not
+ * observed: Prisma's default relation strategy ("query"; this schema enables
+ * no `relationJoins`) sends one more SELECT per nested relation, and only when
+ * the level above it returned rows. `estimateRoundTrips` turns the record into
+ * round trips; its header states each rule and where it was confirmed.
+ *
+ * What "4 per app call" assumes: BEGIN, set_config, the query and COMMIT, with
+ * both statements already prepared on that connection. A cold statement adds a
+ * prepare round trip. When the app connects through a transaction pooler with
+ * `pgbouncer=true`, Prisma turns its statement cache off, so one app call is
+ * about 7 round trips and a nested load about 2. Every number this counter
+ * gives is therefore a floor on wire round trips: good for comparing before
+ * and after, not a latency budget. `APP_CALL_ROUND_TRIPS` stays 4 until it is
+ * measured against Postgres.
  */
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Prisma } from "@prisma/client";
+import { argumentShape, isCompactable } from "./readiness/admin-batching";
 
 export type QueryClient = "app" | "admin";
 
@@ -27,22 +39,49 @@ export interface QueryCaller {
   readonly line: number;
 }
 
+/**
+ * "batch": `$transaction([...])`. "interactive": `$transaction(async (tx) => ...)`.
+ * "appTransaction": `withAppTransaction` or `withAppReadTransaction`, an
+ * interactive transaction on the raw app client with its own isolation level
+ * and set_config.
+ */
+export type TransactionKind = "batch" | "interactive" | "appTransaction";
+
+export interface TransactionRef {
+  readonly id: number;
+  readonly kind: TransactionKind;
+}
+
 export interface RecordedQuery {
   readonly client: QueryClient;
   /** Model in client casing ("studentTask"), or "(raw)". */
   readonly model: string;
   readonly operation: string;
   readonly inInteractiveTransaction: boolean;
-  /** Nested relations in `select` / `include`. Derived from arguments. */
+  /** The transaction the call ran in, or null for a call on its own. */
+  readonly transaction: TransactionRef | null;
+  /** Nested relations in `select` / `include`, read from the arguments alone. */
   readonly relationLoads: number;
+  /**
+   * The nested SELECTs the call would send for the result it got: a level that
+   * returned no rows sends none below it. Where the result does not show a
+   * relation (a write, or a fixture that leaves it out), or no fixture answered
+   * the call, the arguments decide.
+   */
+  readonly nestedLoads: number;
+  /**
+   * Set on admin-client findUnique calls Prisma's dataloader sends as one
+   * statement: same tick, model, operation and argument shape. Equal values share
+   * one statement. See `estimateRoundTrips`.
+   */
+  readonly sameTickBatch: string | null;
   /** "default" means no fixture was set and the empty result was returned. */
   readonly answeredBy: "fixture" | "default";
   readonly caller: QueryCaller;
 }
 
-export interface RecordedTransaction {
+export interface RecordedTransaction extends TransactionRef {
   readonly client: QueryClient;
-  readonly kind: "batch" | "interactive";
 }
 
 /**
@@ -76,17 +115,22 @@ export interface QuerySummary {
   readonly app: number;
   readonly admin: number;
   readonly total: number;
-  readonly relationLoads: number;
+  readonly appNestedLoads: number;
+  readonly adminNestedLoads: number;
   readonly byCaller: readonly CallerSummary[];
 }
 
 export interface QueryCounter {
   /** Pass to `mock.module("@/lib/db", { exports: ... })`. */
-  readonly dbModule: Readonly<Record<"prisma" | "prismaAdmin" | "withAppTransaction", unknown>>;
+  readonly dbModule: Readonly<Record<"prisma" | "prismaAdmin" | "withAppTransaction" | "withAppReadTransaction", unknown>>;
   queries(): readonly RecordedQuery[];
   transactions(): readonly RecordedTransaction[];
-  /** Runs `work` and returns the queries issued before it settled. */
-  section<T>(work: () => Promise<T>): Promise<{ value: T; queries: readonly RecordedQuery[] }>;
+  /** Runs `work` and returns the queries and transactions issued before it settled. */
+  section<T>(work: () => Promise<T>): Promise<{
+    value: T;
+    queries: readonly RecordedQuery[];
+    transactions: readonly RecordedTransaction[];
+  }>;
   /** Replaces the whole fixture set. */
   useFixtures(fixtures: QueryFixtures): void;
   /**
@@ -167,6 +211,42 @@ function countRelationLoads(model: string, args: unknown): number {
   return countSelection(model, args.select) + countSelection(model, args.include);
 }
 
+/** A result as rows: nothing for null, one row for an object. */
+function asRows(value: unknown): readonly unknown[] {
+  if (Array.isArray(value)) return value;
+  return value === null || value === undefined ? [] : [value];
+}
+
+/** The nested SELECTs one selection sends below `parents`, a level that returned rows. */
+function loadedSelection(model: string, selection: unknown, parents: readonly unknown[]): number {
+  if (!isRecord(selection)) return 0;
+  const relations = RELATIONS.get(model);
+  let total = 0;
+  for (const [field, value] of Object.entries(selection)) {
+    const related = relations?.get(field);
+    if (!related || value === false || value === null || value === undefined) continue;
+    // Prisma sends the relation's SELECT because the parents exist.
+    const shown = parents.every((row) => isRecord(row) && Object.hasOwn(row, field));
+    total += 1 + (shown
+      ? loadedRelations(related, value, parents.flatMap((row) => (isRecord(row) ? asRows(row[field]) : [])))
+      : countRelationLoads(related, value));
+  }
+  return total;
+}
+
+/**
+ * Nested loads for the rows a fixture returned. A level with no rows sends no
+ * SELECT for the relations below it; a relation the result does not show is
+ * counted in full from the arguments, the larger answer. A call no fixture
+ * answered is not passed here: its loads are counted in full.
+ */
+function loadedRelations(model: string, args: unknown, result: unknown): number {
+  const parents = asRows(result);
+  if (!isRecord(args) || parents.length === 0) return 0;
+  return loadedSelection(model, args.select, parents) + loadedSelection(model, args.include, parents);
+}
+
+const BATCHED_OPERATIONS: ReadonlySet<string> = new Set(["findUnique", "findUniqueOrThrow"]);
 /** `at name (location:line:col)` or `at location:line:col`, source-mapped. */
 function parseFrame(line: string): QueryCaller | null {
   const body = /^\s*at (?:async )?(.*)$/.exec(line)?.[1];
@@ -202,15 +282,20 @@ function captureCaller(): QueryCaller {
 /** Sent on first `then`, like a PrismaPromise: never awaited, never sent. */
 class LazyQuery implements PromiseLike<unknown> {
   #sent: Promise<unknown> | undefined;
-  readonly #send: () => unknown;
+  readonly #send: (transaction: TransactionRef | null) => unknown;
 
-  constructor(send: () => unknown) {
+  constructor(send: (transaction: TransactionRef | null) => unknown) {
     this.#send = send;
   }
 
-  #start(): Promise<unknown> {
-    this.#sent ??= new Promise((resolve) => resolve(this.#send()));
+  #start(transaction: TransactionRef | null = null): Promise<unknown> {
+    this.#sent ??= new Promise((resolve) => resolve(this.#send(transaction)));
     return this.#sent;
+  }
+
+  /** Sends the query as part of a batch `$transaction([...])`. */
+  runIn(transaction: TransactionRef): Promise<unknown> {
+    return this.#start(transaction);
   }
 
   then<A = unknown, B = never>(
@@ -298,12 +383,26 @@ function rawCallArguments(first: unknown, rest: readonly unknown[]): { sql: stri
 
 type Queryable = Record<string, unknown>;
 
+interface PendingQuery {
+  readonly client: QueryClient;
+  readonly model: string;
+  readonly operation: string;
+  readonly transaction: TransactionRef | null;
+  readonly answeredBy: "fixture" | "default";
+  readonly caller: QueryCaller;
+  readonly args: unknown;
+}
+
 /** The counter's state and the fake clients that write to it. */
 class Recorder {
   fixtures: QueryFixtures;
   observer: QueryObserver | null = null;
   readonly queries: RecordedQuery[] = [];
   readonly transactions: RecordedTransaction[] = [];
+  #nextTransactionId = 1;
+  #nextTick = 1;
+  /** The open dataloader window: set by the first batchable call, closed on process.nextTick. */
+  #openTick: number | null = null;
 
   constructor(fixtures: QueryFixtures) {
     this.fixtures = fixtures;
@@ -318,66 +417,105 @@ class Recorder {
     return { answeredBy: "fixture" as const, resolve: () => (isResolver(fixture) ? fixture(args) : fixture) };
   }
 
-  /** Records the query, resolves its answer, then tells the observer. */
-  async #send(query: RecordedQuery, args: unknown, resolve: () => unknown): Promise<unknown> {
-    this.queries.push(query);
+  /**
+   * Mirrors Prisma 6's DataLoader (runtime/library.js): a findUnique outside a
+   * transaction opens a window that closes on process.nextTick, and calls in
+   * one window with one model, operation and argument shape go out as one batch.
+   */
+  #sameTickBatch(pending: PendingQuery): string | null {
+    if (pending.transaction !== null || !BATCHED_OPERATIONS.has(pending.operation)) return null;
+    if (this.#openTick === null) {
+      const tick = this.#nextTick++;
+      this.#openTick = tick;
+      process.nextTick(() => { if (this.#openTick === tick) this.#openTick = null; });
+    }
+    if (pending.client !== "admin") return null;
+    if (!isCompactable(pending.model, pending.args, countRelationLoads(pending.model, pending.args))) return null;
+    return `${this.#openTick}|${pending.model}|${pending.operation}|${argumentShape(pending.args)}`;
+  }
+
+  /** Records the query, resolves its answer, settles its nested loads, then tells the observer. */
+  async #send(pending: PendingQuery, resolve: () => unknown): Promise<unknown> {
+    const { args, ...fields } = pending;
+    const relationLoads = countRelationLoads(pending.model, args);
+    const query: RecordedQuery = {
+      ...fields,
+      inInteractiveTransaction: pending.transaction !== null && pending.transaction.kind !== "batch",
+      relationLoads,
+      nestedLoads: relationLoads,
+      sameTickBatch: this.#sameTickBatch(pending),
+    };
+    const index = this.queries.push(query) - 1;
+    // A real reply arrives as I/O, after the dataloader's window has closed.
+    // Answering on a microtask instead would merge calls awaited one after another.
+    await new Promise((settle) => setImmediate(settle));
     const result = await resolve();
-    this.observer?.({ query, prismaModel: PRISMA_MODEL_BY_CLIENT_NAME.get(query.model), args, result });
+    // An unanswered call's empty result is the counter's guess, not data: count its loads in full.
+    const nestedLoads = pending.answeredBy === "default" ? relationLoads : loadedRelations(pending.model, args, result);
+    const settled: RecordedQuery = { ...query, nestedLoads };
+    this.queries[index] = settled;
+    this.observer?.({ query: settled, prismaModel: PRISMA_MODEL_BY_CLIENT_NAME.get(query.model), args, result });
     return result;
   }
 
-  #modelDelegate(client: QueryClient, model: string, inInteractiveTransaction: boolean): Queryable {
+  #modelDelegate(client: QueryClient, model: string, own: TransactionRef | null): Queryable {
     return Object.fromEntries(MODEL_OPERATIONS.map((operation) => [operation, (args?: unknown) => {
       const caller = captureCaller();
-      return new LazyQuery(() => {
+      return new LazyQuery((batch) => {
         const { answeredBy, resolve } = this.#answer(client, `${model}.${operation}`, args, () =>
           defaultResult(model, operation, args));
-        return this.#send({
-          client, model, operation, inInteractiveTransaction, answeredBy, caller,
-          relationLoads: countRelationLoads(model, args),
-        }, args, resolve);
+        return this.#send({ client, model, operation, transaction: own ?? batch, answeredBy, caller, args }, resolve);
       });
     }]));
   }
 
-  #rawMethods(client: QueryClient, inInteractiveTransaction: boolean): Queryable {
+  #rawMethods(client: QueryClient, own: TransactionRef | null): Queryable {
     return Object.fromEntries(RAW_OPERATIONS.map((operation) => [operation, (first: unknown, ...rest: unknown[]) => {
       const caller = captureCaller();
-      return new LazyQuery(() => {
+      return new LazyQuery((batch) => {
         const empty = operation.startsWith("$queryRaw") ? [] : 0;
         const rawArgs = rawCallArguments(first, rest);
         const { answeredBy, resolve } = this.#answer(client, operation, rawArgs, () => empty);
         return this.#send({
-          client, model: RAW_MODEL, operation, inInteractiveTransaction, answeredBy, caller, relationLoads: 0,
-        }, rawArgs, resolve);
+          client, model: RAW_MODEL, operation, transaction: own ?? batch, answeredBy, caller, args: rawArgs,
+        }, resolve);
       });
     }]));
   }
 
-  #queryable(client: QueryClient, inInteractiveTransaction: boolean): Queryable {
+  #queryable(client: QueryClient, transaction: TransactionRef | null): Queryable {
     return {
       ...Object.fromEntries(
-        MODEL_NAMES.map((model) => [model, this.#modelDelegate(client, model, inInteractiveTransaction)]),
+        MODEL_NAMES.map((model) => [model, this.#modelDelegate(client, model, transaction)]),
       ),
-      ...this.#rawMethods(client, inInteractiveTransaction),
+      ...this.#rawMethods(client, transaction),
     };
   }
 
-  interactive<T>(client: QueryClient, work: (tx: Queryable) => Promise<T>): Promise<T> {
-    this.transactions.push({ client, kind: "interactive" });
-    return work(this.#queryable(client, true));
+  #open(client: QueryClient, kind: TransactionKind): TransactionRef {
+    const transaction: RecordedTransaction = { id: this.#nextTransactionId++, kind, client };
+    this.transactions.push(transaction);
+    return { id: transaction.id, kind };
+  }
+
+  interactive<T>(client: QueryClient, kind: TransactionKind, work: (tx: Queryable) => Promise<T>): Promise<T> {
+    return work(this.#queryable(client, this.#open(client, kind)));
+  }
+
+  async #batch(client: QueryClient, input: readonly unknown[]): Promise<unknown[]> {
+    const transaction = this.#open(client, "batch");
+    const results: unknown[] = [];
+    for (const query of input) results.push(await (query instanceof LazyQuery ? query.runIn(transaction) : query));
+    return results;
   }
 
   client(name: QueryClient): Queryable {
     return {
-      ...this.#queryable(name, false),
+      ...this.#queryable(name, null),
       $transaction: async (input: unknown) => {
-        if (isResolver(input)) return this.interactive(name, async (tx) => input(tx));
+        if (isResolver(input)) return this.interactive(name, "interactive", async (tx) => input(tx));
         if (!Array.isArray(input)) throw new Error("$transaction expects an array of queries or a function.");
-        this.transactions.push({ client: name, kind: "batch" });
-        const results: unknown[] = [];
-        for (const query of input) results.push(await query);
-        return results;
+        return this.#batch(name, input);
       },
     };
   }
@@ -390,14 +528,22 @@ export function createQueryCounter(initialFixtures: QueryFixtures = {}): QueryCo
     dbModule: {
       prisma: recorder.client("app"),
       prismaAdmin: recorder.client("admin"),
-      withAppTransaction: <T>(work: (tx: Queryable) => Promise<T>) => recorder.interactive("app", work),
+      withAppTransaction: <T>(work: (tx: Queryable) => Promise<T>) =>
+        recorder.interactive("app", "appTransaction", work),
+      withAppReadTransaction: <T>(work: (tx: Queryable) => Promise<T>) =>
+        recorder.interactive("app", "appTransaction", work),
     },
     queries: () => [...recorder.queries],
     transactions: () => [...recorder.transactions],
     async section(work) {
       const start = recorder.queries.length;
+      const startTransactions = recorder.transactions.length;
       const value = await work();
-      return { value, queries: recorder.queries.slice(start) };
+      return {
+        value,
+        queries: recorder.queries.slice(start),
+        transactions: recorder.transactions.slice(startTransactions),
+      };
     },
     useFixtures(next) {
       assertKnownFixtureKeys(next);
@@ -421,6 +567,8 @@ export function summarizeQueries(queries: readonly RecordedQuery[]): QuerySummar
   }
   const countFor = (list: readonly RecordedQuery[], client: QueryClient) =>
     list.filter((query) => query.client === client).length;
+  const nestedFor = (client: QueryClient) =>
+    queries.filter((query) => query.client === client).reduce((sum, query) => sum + query.nestedLoads, 0);
   const byCaller = [...groups.values()].flatMap((list) => {
     const [first] = list;
     if (!first) return [];
@@ -433,9 +581,96 @@ export function summarizeQueries(queries: readonly RecordedQuery[]): QuerySummar
     app: countFor(queries, "app"),
     admin: countFor(queries, "admin"),
     total: queries.length,
-    relationLoads: queries.reduce((sum, query) => sum + query.relationLoads, 0),
+    appNestedLoads: nestedFor("app"),
+    adminNestedLoads: nestedFor("admin"),
     byCaller,
   };
+}
+
+/** Round trips a lone app-client call pays: BEGIN, set_config, the query, COMMIT (`runWithContext`, src/lib/db.ts). */
+export const APP_CALL_ROUND_TRIPS = 4;
+/**
+ * Statements `withAppTransaction` and `withAppReadTransaction` (src/lib/db.ts)
+ * add around their queries: BEGIN, SET TRANSACTION ISOLATION LEVEL
+ * (SERIALIZABLE or REPEATABLE READ; both pass a level, so the count is the
+ * same; counted as its own statement, the larger reading), set_config, COMMIT.
+ * Its queries run on the raw app client, so each is 1, not 4.
+ */
+export const APP_TRANSACTION_OVERHEAD = 4;
+/** BEGIN and COMMIT around any other `$transaction`. */
+export const TRANSACTION_OVERHEAD = 2;
+
+export interface ClientCost {
+  readonly calls: number;
+  readonly nestedLoads: number;
+  /** Statements that carry a query: calls, less same-tick merges, plus nested loads. */
+  readonly statements: number;
+  readonly roundTrips: number;
+}
+
+export interface RoundTripEstimate {
+  readonly app: ClientCost;
+  readonly admin: ClientCost;
+}
+
+/** Round trips a call's own query costs, before nested loads and transaction overhead. */
+function callRoundTrips(query: RecordedQuery): number {
+  if (query.client === "admin") return 1;
+  // Inside withAppTransaction the raw client runs the query bare. Inside
+  // prisma.$transaction the RLS extension still wraps each call in its own
+  // batch; whether Prisma nests or merges that batch is unverified here, so
+  // the call keeps its full wrapper cost, the larger reading.
+  return query.transaction?.kind === "appTransaction" ? 1 : APP_CALL_ROUND_TRIPS;
+}
+
+function costFor(
+  client: QueryClient,
+  queries: readonly RecordedQuery[],
+  transactions: readonly RecordedTransaction[],
+): ClientCost {
+  const own = queries.filter((query) => query.client === client);
+  const nestedLoads = own.reduce((sum, query) => sum + query.nestedLoads, 0);
+  const seenBatches = new Set<string>();
+  let sent = 0;
+  let roundTrips = 0;
+  for (const query of own) {
+    if (query.sameTickBatch !== null && seenBatches.has(query.sameTickBatch)) continue;
+    if (query.sameTickBatch !== null) seenBatches.add(query.sameTickBatch);
+    sent += 1;
+    roundTrips += callRoundTrips(query);
+  }
+  const overhead = transactions
+    .filter((transaction) => transaction.client === client)
+    .reduce((sum, transaction) =>
+      sum + (transaction.kind === "appTransaction" ? APP_TRANSACTION_OVERHEAD : TRANSACTION_OVERHEAD), 0);
+  return { calls: own.length, nestedLoads, statements: sent + nestedLoads, roundTrips: roundTrips + nestedLoads + overhead };
+}
+
+/**
+ * Estimated round trips to Postgres, per client. The rules:
+ * - an app-client call alone: 4 (BEGIN, set_config, query, COMMIT), because
+ *   `runWithContext` in src/lib/db.ts sends `$transaction([set_config, query])`
+ *   for every call; each call is its own transaction, so Prisma never batches
+ *   two app-client calls together.
+ * - an admin-client call: 1. Admin findUnique / findUniqueOrThrow calls outside
+ *   a transaction, issued before process.nextTick, with the same model,
+ *   operation and argument shape, a where of one `@id` or `@unique` field
+ *   holding a string or number, and no nested loads, count 1 together
+ *   (`isMergeableWhere` in src/lib/readiness/admin-batching.ts):
+ *   Prisma 6.19's DataLoader (node_modules/@prisma/client/runtime/library.js,
+ *   `batchBy` -> `Zl`, `dispatchBatches`) sends them as one `requestBatch`, and
+ *   the engine compacts such a batch into one select.
+ * - each nested relation load: 1 more, on the client of the call that loads it,
+ *   counted only when the level above returned rows.
+ * - withAppTransaction: 4 around its queries, each query 1.
+ * - any other `$transaction`, either form: 2 (BEGIN, COMMIT) around its queries,
+ *   each costed as it would be alone.
+ */
+export function estimateRoundTrips(
+  queries: readonly RecordedQuery[],
+  transactions: readonly RecordedTransaction[],
+): RoundTripEstimate {
+  return { app: costFor("app", queries, transactions), admin: costFor("admin", queries, transactions) };
 }
 
 function queryName(query: RecordedQuery): string {
@@ -444,8 +679,11 @@ function queryName(query: RecordedQuery): string {
 
 function describeQuery(query: RecordedQuery): string {
   const name = queryName(query);
-  const relations = query.relationLoads > 0 ? `(+${query.relationLoads} relations)` : "";
-  return `${name}:${query.caller.line}${relations}${query.inInteractiveTransaction ? "[tx]" : ""}`;
+  const relations = query.nestedLoads > 0 ? `(+${query.nestedLoads} nested)` : "";
+  const skipped = query.relationLoads > query.nestedLoads ? `(${query.relationLoads - query.nestedLoads} nested not sent: no rows)` : "";
+  const transaction = query.transaction ? `[tx${query.transaction.id}]` : "";
+  const batch = query.sameTickBatch ? "[batched]" : "";
+  return `${name}:${query.caller.line}${relations}${skipped}${transaction}${batch}`;
 }
 
 /** One line per issuing function: its file, its counts, and each query with its source line. */
@@ -461,7 +699,8 @@ export function formatQueryBreakdown(label: string, queries: readonly RecordedQu
   });
   const unfixtured = queries.filter((query) => query.answeredBy === "default").map(queryName);
   return [
-    `${label}: app ${summary.app}, admin ${summary.admin}, nested relation loads ${summary.relationLoads}`,
+    `${label}: app ${summary.app}, admin ${summary.admin}, ` +
+      `nested relation loads app ${summary.appNestedLoads}, admin ${summary.adminNestedLoads}`,
     ...rows,
     ...(unfixtured.length > 0
       ? [`  answered by default (${unfixtured.length} of ${queries.length}): ${[...new Set(unfixtured)].join(", ")}`]
@@ -481,20 +720,26 @@ export interface QueryCountReport {
   readonly path: string;
   readonly cache: "cold" | "warm";
   readonly queries: readonly RecordedQuery[];
+  readonly transactions: readonly RecordedTransaction[];
   /** Queries counted by reading the source because the test could not run them. */
   readonly readNotExecuted: number;
 }
 
 /** The line `scripts/readiness/query-count.mjs` parses. Change both together. */
 export function queryCountLine(report: QueryCountReport): string {
-  const summary = summarizeQueries(report.queries);
+  const { app, admin } = estimateRoundTrips(report.queries, report.transactions);
   return [
     "QUERY_COUNT",
     `path=${report.path}`,
     `cache=${report.cache}`,
-    `app=${summary.app}`,
-    `admin=${summary.admin}`,
-    `relationLoads=${summary.relationLoads}`,
+    `app=${app.calls}`,
+    `admin=${admin.calls}`,
+    `appNested=${app.nestedLoads}`,
+    `adminNested=${admin.nestedLoads}`,
+    `appStatements=${app.statements}`,
+    `adminStatements=${admin.statements}`,
+    `appRoundTrips=${app.roundTrips}`,
+    `adminRoundTrips=${admin.roundTrips}`,
     `read=${report.readNotExecuted}`,
   ].join(" ");
 }

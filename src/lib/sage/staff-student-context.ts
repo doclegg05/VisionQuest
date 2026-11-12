@@ -3,6 +3,7 @@ import "server-only";
 import { buildManagedStudentWhere, assertStaffCanManageStudent } from "@/lib/classroom";
 import { MANAGED_ROSTER_CAP } from "@/lib/ai/identity";
 import { prisma } from "@/lib/db";
+import { recordStudentView } from "@/lib/audit";
 import { type Session } from "@/lib/api-error";
 import { parseState } from "@/lib/progression/engine";
 import { fetchStudentReadinessData } from "@/lib/progression/fetch-readiness-data";
@@ -515,18 +516,40 @@ async function buildVerifiedStudentRecordContext(studentId: string): Promise<str
   return lines.join("\n");
 }
 
+/**
+ * Build the verified record for one resolved student and, when a record was
+ * read, write a `sage_chat` view row: the staff member is reading the
+ * student's record through Sage. Sampled like the other surfaces (one row
+ * per staff member, student and day). Lives here, not in the chat route, so
+ * every caller of the staff context is audited.
+ */
+async function resolvedStudentContext(
+  session: Session,
+  studentDbId: string,
+): Promise<StaffStudentContextResult> {
+  const context = await buildVerifiedStudentRecordContext(studentDbId);
+  if (context) {
+    await recordStudentView({
+      actorId: session.id,
+      actorRole: session.role,
+      targetStudentId: studentDbId,
+      surface: "sage_chat",
+    });
+  }
+  return {
+    context,
+    targetStudentId: studentDbId,
+    resolution: context ? "resolved" : "not_found",
+  };
+}
+
 export async function buildStaffStudentContext(
   session: Session,
   options: StaffStudentContextOptions,
 ): Promise<StaffStudentContextResult> {
   if (options.targetStudentId) {
     const student = await assertStaffCanManageStudent(session, options.targetStudentId);
-    const context = await buildVerifiedStudentRecordContext(student.id);
-    return {
-      context,
-      targetStudentId: student.id,
-      resolution: context ? "resolved" : "not_found",
-    };
+    return resolvedStudentContext(session, student.id);
   }
 
   const candidates = await prisma.student.findMany({
@@ -549,12 +572,7 @@ export async function buildStaffStudentContext(
   );
 
   if (resolution.status === "resolved" && resolution.student) {
-    const context = await buildVerifiedStudentRecordContext(resolution.student.id);
-    return {
-      context,
-      targetStudentId: resolution.student.id,
-      resolution: context ? "resolved" : "not_found",
-    };
+    return resolvedStudentContext(session, resolution.student.id);
   }
 
   if (resolution.status === "ambiguous") {

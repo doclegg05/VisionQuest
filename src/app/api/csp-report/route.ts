@@ -35,7 +35,7 @@ const reportFieldsSchema = z.object({
   documentURL: z.string().optional(),
 });
 
-/** First forwarded hop, the same key the auth routes limit on. */
+/** The client address the platform's proxy appended, the same key the auth routes limit on. */
 function clientIp(req: NextRequest): string {
   return clientIpBucket(req);
 }

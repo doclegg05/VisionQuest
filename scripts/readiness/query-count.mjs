@@ -5,27 +5,37 @@
 //
 //   <path>   dashboard      M1, one student dashboard render
 //            teacher-home   M6, one teacher home render
-//            chat-send      M3, POST /api/chat/send up to stream creation
+//            chat-send      M3, POST /api/chat/send before its first word: the
+//                           larger of the round trips before the route builds
+//                           its stream and before it first calls the provider
+//            dashboard-idle M2, statements per minute an open, idle student
+//                           dashboard costs through its polls. A rate, not a
+//                           render: --cache and --unit do not apply to it,
+//                           --client does
 //
 // The last line of stdout is the count as a bare number, printed only when
 // the measurement ran clean. By default it is the cold count in estimated
-// round trips to the database:
+// round trips to the database, as `estimateRoundTrips` in
+// src/lib/query-counter.test-support.ts computes it and the test prints it:
 //   4 for each app-client call (BEGIN, set_config, the query, COMMIT: see the
-//     RLS wrapper in src/lib/db.ts),
-//   1 for each admin-client call,
-//   1 for each nested relation a call loads (one more SELECT in the same
-//     transaction).
-// So turning three calls into one call with two includes reads 12 to 6, as it
-// does on the wire. --unit=statements counts calls plus nested loads with no
-// weights; --unit=calls counts calls only. Dashboard and teacher-home count
-// the app client; chat-send counts app plus admin.
-//
-// Known limits, from the 2026-11-10 database review: the nested figure is
-// derived from each call's select and include, even when the parent returns
-// nothing; two reads inside one interactive transaction are weighted as two
-// wrapped calls; same-tick findUnique calls on the admin client are counted
-// one each although Prisma batches them; and the chat-send fixture is not yet
-// a normal turn. Task T4 in the readiness plan closes these.
+//     RLS wrapper in src/lib/db.ts), when both statements are already prepared
+//     on that connection,
+//   1 for each admin-client call, with same-tick findUnique calls of one shape
+//     counted once, as Prisma's dataloader sends them,
+//   1 for each nested relation a call loads, when the level above it returned
+//     rows,
+//   withAppTransaction or withAppReadTransaction as it runs: 4 around its queries, each query 1;
+//   any other $transaction: 2 around its queries.
+// --unit=statements counts the statements that carry a query (calls after
+// batching, plus nested loads); --unit=calls counts calls only.
+// Every path counts app plus admin by default (--client=all). An admin call
+// still costs a round trip, so leaving it out would reward moving a read from
+// `prisma` to `prismaAdmin`, which also skips row-level security.
+// A cold statement adds a prepare round trip. Through a transaction pooler with
+// pgbouncer=true, Prisma turns its statement cache off, so an app call is about
+// 7 and a nested load about 2. Every number printed is therefore a floor on
+// wire round trips: good for comparing before and after, not a latency budget.
+// What else the estimate cannot see is listed in the support file's header.
 //
 // How it measures: it runs the path's test file under src/lib/readiness/ in a
 // child process and reads the QUERY_COUNT lines that test prints. It does not
@@ -37,36 +47,99 @@
 // error or nothing measured.
 import { spawnSync } from "node:child_process";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
-const PATHS = {
-  dashboard: { metric: "M1", test: "src/lib/readiness/dashboard-query-count.test.tsx", client: "app" },
-  "teacher-home": { metric: "M6", test: "src/lib/readiness/teacher-home-query-count.test.tsx", client: "app" },
-  "chat-send": { metric: "M3", test: "src/lib/readiness/chat-send-query-count.test.ts", client: "all" },
+export const PATHS = {
+  dashboard: { metric: "M1", test: "src/lib/readiness/dashboard-query-count.test.tsx" },
+  "teacher-home": { metric: "M6", test: "src/lib/readiness/teacher-home-query-count.test.tsx" },
+  "chat-send": { metric: "M3", test: "src/lib/readiness/chat-send-query-count.test.ts" },
+  "dashboard-idle": { metric: "M2", test: "src/lib/readiness/dashboard-idle-query-count.test.ts", rate: true },
 };
+const DEFAULT_CLIENT = "all";
 const CACHES = ["cold", "warm"];
 const CLIENTS = ["app", "admin", "all"];
 const UNITS = ["round-trips", "statements", "calls"];
-const APP_CALL_ROUND_TRIPS = 4;
-const COUNT_LINE = /QUERY_COUNT path=(\S+) cache=(cold|warm) app=(\d+) admin=(\d+) relationLoads=(\d+) read=(\d+)/;
+const COUNT_FIELDS = [
+  "app", "admin", "appNested", "adminNested", "appStatements", "adminStatements", "appRoundTrips", "adminRoundTrips", "read",
+];
+const COUNT_LINE = new RegExp(
+  `QUERY_COUNT path=(\\S+) cache=(cold|warm) ${COUNT_FIELDS.map((field) => `${field}=(\\d+)`).join(" ")}`,
+);
+
+const RATE_LINE = /IDLE_RATE path=(\S+) windowMs=(\d+) ticks=(\d+) appPerMinute=([\d.]+) adminPerMinute=([\d.]+) perMinute=([\d.]+)(?: appRoundTripsPerMinute=([\d.]+) adminRoundTripsPerMinute=([\d.]+))?/;
+
+/**
+ * The idle rate a rate path's test printed, or null. Round trips a minute
+ * (BEGIN, SET, set_config and COMMIT included) come along when printed: the
+ * database load beside the statement metric, reported and never totalled.
+ */
+export function parseRate(name, output) {
+  for (const line of output.split("\n")) {
+    const match = RATE_LINE.exec(line);
+    if (!match || match[1] !== name) continue;
+    const [windowMs, ticks, app, admin] = match.slice(2, 6).map(Number);
+    const rate = { windowMs, ticks, app, admin };
+    return match[7] === undefined ? rate : { ...rate, appRoundTrips: Number(match[7]), adminRoundTrips: Number(match[8]) };
+  }
+  return null;
+}
+
+/** Statements per minute for the chosen client. */
+export function rateTotal(rate, { client }) {
+  return (client === "admin" ? 0 : rate.app) + (client === "app" ? 0 : rate.admin);
+}
+
+const BOUNDARY_LINE = /QUERY_BOUNDARY path=(\S+) cache=(cold|warm) beforeStream=(\d+) beforeProvider=(\d+)/;
+
+/** chat-send's two first-word boundaries, by cache, in round trips. */
+export function parseBoundaries(name, output) {
+  const boundaries = {};
+  for (const line of output.split("\n")) {
+    const match = BOUNDARY_LINE.exec(line);
+    if (!match || match[1] !== name) continue;
+    boundaries[match[2]] = { beforeStream: Number(match[3]), beforeProvider: Number(match[4]) };
+  }
+  return boundaries;
+}
+
+export function describeBoundary(cache, { beforeStream, beforeProvider }) {
+  return `  ${cache}: before the stream ${beforeStream}, before the provider call ${beforeProvider}; the gate reads the larger`;
+}
+
+const USAGE = [
+  `Usage: query-count.mjs <${Object.keys(PATHS).join("|")}> [--cache=cold|warm] [--client=app|admin|all] [--unit=round-trips|statements|calls]`,
+  "  --cache=cold (the default) or --cache=warm",
+  "  --client=all (the default) counts app and admin; --client=app or --client=admin counts one",
+  "  --unit=round-trips (the default), --unit=statements or --unit=calls",
+  "",
+  "What the round trips assume. 4 per app call (BEGIN, set_config, the query, COMMIT) is the case",
+  "where both statements are already prepared on that connection; a cold statement adds a prepare",
+  "round trip. When the app connects through a transaction pooler with pgbouncer=true, Prisma turns",
+  "its statement cache off, so one app call is about 7 and a nested load about 2. Every number this",
+  "prints is a floor on wire round trips: good for comparing before and after, not a latency budget.",
+].join("\n");
 
 function usage(problem) {
-  console.error(`${problem}\nUsage: query-count.mjs <${Object.keys(PATHS).join("|")}> [--cache=${CACHES.join("|")}] [--client=${CLIENTS.join("|")}] [--unit=${UNITS.join("|")}]`);
+  console.error(`${problem}\n${USAGE}`);
   process.exit(2);
 }
 
-function parseArguments(argv) {
+const CHOICES = { "--cache": CACHES, "--client": CLIENTS, "--unit": UNITS };
+const OPTION_KEYS = { "--cache": "cache", "--client": "client", "--unit": "unit" };
+
+export function parseArguments(argv) {
   const [name, ...flags] = argv;
   if (!name || !Object.hasOwn(PATHS, name)) usage(`Unknown path "${name ?? ""}".`);
-  const options = { name, cache: "cold", client: PATHS[name].client, unit: "round-trips" };
+  const options = { name, cache: "cold", client: DEFAULT_CLIENT, unit: "round-trips" };
   for (const flag of flags) {
     const [key, value] = flag.split("=");
-    if (key === "--cache" && CACHES.includes(value)) options.cache = value;
-    else if (key === "--client" && CLIENTS.includes(value)) options.client = value;
-    else if (key === "--unit" && UNITS.includes(value)) options.unit = value;
-    else usage(`Unknown option "${flag}".`);
+    const choices = Object.hasOwn(CHOICES, key) ? CHOICES[key] : undefined;
+    if (!choices) usage(`Unknown option "${flag}".`);
+    if (value === undefined) usage(`${key} needs a value: ${choices.map((choice) => `${key}=${choice}`).join(", ").replace(/, ([^,]*)$/, " or $1")}.`);
+    if (!choices.includes(value)) usage(`Unknown value in "${flag}".`);
+    options[OPTION_KEYS[key]] = value;
   }
   return options;
 }
@@ -84,46 +157,83 @@ function parseCounts(name, output) {
   for (const line of output.split("\n")) {
     const match = COUNT_LINE.exec(line);
     if (!match || match[1] !== name) continue;
-    const [app, admin, relationLoads, read] = match.slice(3).map(Number);
-    counts[match[2]] = { app, admin, relationLoads, read };
+    const values = match.slice(3).map(Number);
+    counts[match[2]] = Object.fromEntries(COUNT_FIELDS.map((field, index) => [field, values[index]]));
   }
   return counts;
 }
 
-function total(count, { client, unit }) {
-  const app = client === "admin" ? 0 : count.app;
-  const admin = client === "app" ? 0 : count.admin;
-  const nested = unit === "calls" ? 0 : count.relationLoads;
-  const appWeight = unit === "round-trips" ? APP_CALL_ROUND_TRIPS : 1;
-  return app * appWeight + admin + nested + count.read;
+const UNIT_FIELDS = {
+  "round-trips": { app: "appRoundTrips", admin: "adminRoundTrips" },
+  statements: { app: "appStatements", admin: "adminStatements" },
+  calls: { app: "app", admin: "admin" },
+};
+
+export function total(count, { client, unit }) {
+  const fields = UNIT_FIELDS[unit];
+  const app = client === "admin" ? 0 : count[fields.app];
+  const admin = client === "app" ? 0 : count[fields.admin];
+  return app + admin + count.read;
 }
 
-const options = parseArguments(process.argv.slice(2));
-const target = PATHS[options.name];
-const run = runTest(target.test);
-const counts = parseCounts(options.name, `${run.stdout ?? ""}\n${run.stderr ?? ""}`);
-const chosen = counts[options.cache];
-
-if (!chosen) {
-  console.error(run.stdout ?? "");
-  console.error(run.stderr ?? "");
-  console.error(`No ${options.cache} count was printed by ${target.test}.`);
-  process.exit(2);
+function reportRate(options, target, run, output) {
+  const rate = parseRate(options.name, output);
+  if (!rate) {
+    console.error(output);
+    console.error(`No idle rate was printed by ${target.test}.`);
+    process.exit(2);
+  }
+  console.log(`${target.metric} ${options.name}: measured by running ${target.test}`);
+  console.log(`  ${rate.ticks} poll moments in ${rate.windowMs / 60_000} simulated minutes; statements a minute: app ${rate.app}, admin ${rate.admin}`);
+  if (rate.appRoundTrips !== undefined) {
+    console.log(`  round trips a minute (BEGIN, SET, set_config, COMMIT included): app ${rate.appRoundTrips}, admin ${rate.adminRoundTrips}`);
+  }
+  console.log(`reporting: statements per minute, ${options.client === "all" ? "app + admin" : options.client}`);
+  if (run.status !== 0) {
+    console.error(`${target.test} failed: the measured rate no longer matches the pinned value, or the path broke. Run it to see which. No number is reported.`);
+    process.exit(1);
+  }
+  console.log(String(rateTotal(rate, options)));
 }
 
-console.log(`${target.metric} ${options.name}: measured by running ${target.test}`);
-for (const cache of CACHES) {
-  const count = counts[cache];
-  if (!count) continue;
-  console.log(
-    `  ${cache}: app ${count.app}, admin ${count.admin}, nested relation loads ${count.relationLoads}` +
-      ` (executed ${count.app + count.admin}, read not executed ${count.read})`,
-  );
+function main() {
+  const options = parseArguments(process.argv.slice(2));
+  const target = PATHS[options.name];
+  const run = runTest(target.test);
+  const output = `${run.stdout ?? ""}\n${run.stderr ?? ""}`;
+  if (target.rate) return reportRate(options, target, run, output);
+  const counts = parseCounts(options.name, output);
+  const chosen = counts[options.cache];
+
+  if (!chosen) {
+    console.error(run.stdout ?? "");
+    console.error(run.stderr ?? "");
+    console.error(`No ${options.cache} count was printed by ${target.test}.`);
+    process.exit(2);
+  }
+
+  console.log(`${target.metric} ${options.name}: measured by running ${target.test}`);
+  for (const cache of CACHES) {
+    const count = counts[cache];
+    if (!count) continue;
+    console.log(
+      `  ${cache}: calls app ${count.app}, admin ${count.admin};` +
+        ` nested loads app ${count.appNested}, admin ${count.adminNested};` +
+        ` statements app ${count.appStatements}, admin ${count.adminStatements};` +
+        ` round trips app ${count.appRoundTrips}, admin ${count.adminRoundTrips}` +
+        ` (read not executed ${count.read})`,
+    );
+  }
+  const boundaries = parseBoundaries(options.name, output);
+  if (Object.keys(boundaries).length > 0) console.log("first-word boundaries, app + admin round trips:");
+  for (const cache of CACHES) if (boundaries[cache]) console.log(describeBoundary(cache, boundaries[cache]));
+  const clientLabel = options.client === "all" ? "app + admin" : options.client;
+  console.log(`reporting: ${options.cache}, ${clientLabel}, in ${options.unit}`);
+  if (run.status !== 0) {
+    console.error(`${target.test} failed: the measured count no longer matches the pinned value, or the path broke. Run it to see which. No number is reported.`);
+    process.exit(1);
+  }
+  console.log(String(total(chosen, options)));
 }
-const clientLabel = options.client === "all" ? "app + admin" : options.client;
-console.log(`reporting: ${options.cache}, ${clientLabel}, in ${options.unit}`);
-if (run.status !== 0) {
-  console.error(`${target.test} failed: the measured count no longer matches the pinned value, or the path broke. Run it to see which. No number is reported.`);
-  process.exit(1);
-}
-console.log(String(total(chosen, options)));
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();

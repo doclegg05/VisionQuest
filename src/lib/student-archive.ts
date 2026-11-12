@@ -1152,9 +1152,9 @@ export async function generateStudentArchive(
     });
   }
 
+  // No name: the key reaches audit rows, logs and presigned URLs (H15c).
   const dateStamp = new Date().toISOString().slice(0, 10);
-  const safeName = student.displayName.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 40);
-  const storageKey = `archives/${studentId}/${safeName}_${dateStamp}.zip`;
+  const storageKey = `archives/${studentId}/archive_${dateStamp}_${crypto.randomUUID().slice(0, 8)}.zip`;
 
   await uploadFile(storageKey, zipBuffer, "application/zip");
 

@@ -4,6 +4,7 @@ import path from "node:path";
 import { describe, it } from "node:test";
 
 import { Prisma } from "@prisma/client";
+import ts from "typescript";
 
 import { isChatContextWrite } from "@/lib/chat-context-write-through";
 
@@ -154,8 +155,21 @@ export function adminReceivers(source: string): string[] {
  * the direct matcher already sees.
  */
 export function findAdminWatchedWrites(source: string, watched: string[]): string[] {
+  const re = adminWriteRegex(source, watched);
+  if (!re) return [];
+  const hits = new Set<string>();
+  for (const match of source.matchAll(re)) hits.add(`${match[1]}.${match[2]}.${match[3]}`);
+  return [...hits].sort();
+}
+
+/**
+ * One regex for `<holder>.<watched delegate>.<write>(`, where a holder is the
+ * admin client, an alias of it, or an admin transaction's callback parameter.
+ * Null when the file never names the admin client.
+ */
+function adminWriteRegex(source: string, watched: string[], flags = "g"): RegExp | null {
   const receivers = adminReceivers(source);
-  if (receivers.length === 0) return [];
+  if (receivers.length === 0) return null;
 
   const delegates = watched.map(delegateName).join("|");
   const writes = WRITE_OPERATIONS.join("|");
@@ -171,16 +185,8 @@ export function findAdminWatchedWrites(source: string, watched: string[]): strin
     for (const match of source.matchAll(txRe)) txParams.add(match[1]);
   }
 
-  const holders = [...escaped, ...txParams];
-  const hits = new Set<string>();
-  for (const holder of holders) {
-    const re = new RegExp(
-      `\\b${holder}\\s*\\.\\s*(${delegates})\\s*\\.\\s*(${writes})\\s*\\(`,
-      "g",
-    );
-    for (const match of source.matchAll(re)) hits.add(`${holder}.${match[1]}.${match[2]}`);
-  }
-  return [...hits].sort();
+  const holders = [...escaped, ...txParams].join("|");
+  return new RegExp(`\\b(${holders})\\s*\\.\\s*(${delegates})\\s*\\.\\s*(${writes})\\s*\\(`, flags);
 }
 
 export interface AdminWriteOffender {
@@ -209,6 +215,264 @@ export function findUninvalidatedAdminWrites(root = ROOT): AdminWriteOffender[] 
   return offenders.sort((a, b) => a.file.localeCompare(b.file));
 }
 
+// ---------------------------------------------------------------------------
+// Function level: every exit after a watched admin write passes a clear.
+//
+// The file-level rule above let src/lib/intake/provision.ts through: its
+// new-student path cleared, so the file "invalidated", while its
+// existing-student path wrote an enrollment and returned with no clear. This
+// check closes that case with the TypeScript parser. Within one function, each
+// exit (a `return`, or falling off the end) that comes after a watched admin
+// write must have a clear call between the last such write and the exit.
+//
+// What counts as one function: a callback passed straight into a call
+// (`prismaAdmin.$transaction(async (tx) => ...)`, `.map(async (row) => ...)`)
+// is part of the function that makes the call, and its own `return`s are not
+// exits. Any other function is its own scope.
+//
+// Two shapes hand the clear to someone else, and are not reported:
+//   - A helper called by name from another function in the same file (a
+//     transaction body, a helper taking `tx`). Its callers are checked
+//     instead, with each call to it counting as a write.
+//   - A `return` in the `catch` of a `try` whose writes all sit inside a
+//     `$transaction` there: the throw rolled them back.
+//
+// Still approximate, on purpose: "between" is source order, not control flow,
+// so a clear in one branch also covers a later return in a sibling branch.
+// That can only miss a gap, never invent one. A helper with no caller in its
+// own file is checked on its own, so an exported helper must clear itself.
+// Writes through a client passed into another file and raw SQL stay out of
+// reach, as in KNOWN LIMITS above.
+// ---------------------------------------------------------------------------
+
+type FunctionWithBody = ts.FunctionLikeDeclaration & { body: ts.ConciseBody };
+
+function hasBody(node: ts.Node): node is FunctionWithBody {
+  return ts.isFunctionLike(node) && "body" in node && node.body !== undefined;
+}
+
+/** A function whose returns leave to a caller: not a callback passed straight into a call. */
+function isOwnScope(node: ts.Node): node is FunctionWithBody {
+  if (!hasBody(node)) return false;
+  return !(ts.isCallExpression(node.parent) && node.parent.arguments.some((arg) => arg === node));
+}
+
+/** The nearest function around a node, transparent or not. */
+function ownFunctionOf(node: ts.Node): ts.Node | null {
+  for (let current = node.parent; current; current = current.parent) if (hasBody(current)) return current;
+  return null;
+}
+
+/** The function whose exits a node's code reaches: callbacks passed into a call are transparent. */
+function exitScopeOf(node: ts.Node): FunctionWithBody | null {
+  for (let current = node.parent; current; current = current.parent) if (isOwnScope(current)) return current;
+  return null;
+}
+
+/** The name a same-file caller would use: `function f`, `const f = () =>`, a method. */
+function scopeName(scope: FunctionWithBody): string | null {
+  if (scope.name && ts.isIdentifier(scope.name)) return scope.name.text;
+  const parent = scope.parent;
+  return ts.isVariableDeclaration(parent) && ts.isIdentifier(parent.name) ? parent.name.text : null;
+}
+
+interface Event { readonly node: ts.Node; readonly text: string }
+
+interface ScopeEvents {
+  readonly name: string | null;
+  readonly writes: Event[];
+  readonly calls: Event[];
+  readonly clears: ts.Node[];
+  readonly exits: ts.Node[];
+}
+
+function bodyEndIsReachable(body: ts.Node): boolean {
+  if (!ts.isBlock(body)) return true;
+  const last = body.statements.at(-1);
+  return !last || !(ts.isReturnStatement(last) || ts.isThrowStatement(last));
+}
+
+function recordCall(events: ScopeEvents, node: ts.CallExpression, sf: ts.SourceFile, write: RegExp): void {
+  const callee = node.expression.getText(sf).replace(/\s+/g, "");
+  if (write.test(`${callee}(`)) events.writes.push({ node, text: callee });
+  else if (INVALIDATION_CALLS.includes(`${callee}(`)) events.clears.push(node);
+  else if (ts.isIdentifier(node.expression)) events.calls.push({ node, text: callee });
+}
+
+function collectScopeEvents(sf: ts.SourceFile, write: RegExp): Map<ts.Node, ScopeEvents> {
+  const scopes = new Map<ts.Node, ScopeEvents>();
+  const eventsOf = (scope: FunctionWithBody): ScopeEvents => {
+    const found = scopes.get(scope) ?? { name: scopeName(scope), writes: [], calls: [], clears: [], exits: [] };
+    scopes.set(scope, found);
+    return found;
+  };
+  const visit = (node: ts.Node): void => {
+    const scope = exitScopeOf(node);
+    if (scope && ts.isCallExpression(node)) recordCall(eventsOf(scope), node, sf, write);
+    // A callback's own return hands a value back to the call, not to a caller.
+    if (scope && ts.isReturnStatement(node) && ownFunctionOf(node) === scope) eventsOf(scope).exits.push(node);
+    if (isOwnScope(node) && bodyEndIsReachable(node.body)) eventsOf(node).exits.push(node.body);
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return scopes;
+}
+
+function isInside(node: ts.Node, ancestor: ts.Node): boolean {
+  return node.getStart() >= ancestor.getStart() && node.getEnd() <= ancestor.getEnd();
+}
+
+/** Inside a `$transaction(...)` call that sits inside `block`. */
+function inTransactionWithin(node: ts.Node, block: ts.Node): boolean {
+  for (let current = node.parent; current && current !== block; current = current.parent) {
+    if (ts.isCallExpression(current) && /\.\$transaction$/.test(current.expression.getText().replace(/\s+/g, ""))) return true;
+  }
+  return false;
+}
+
+/** Writes an exit's catch clause rolled back: in a `$transaction` inside the matching `try`. */
+function rolledBackBy(exit: ts.Node, writes: readonly Event[]): readonly Event[] {
+  for (let current = exit.parent; current; current = current.parent) {
+    if (hasBody(current)) return writes;
+    if (!ts.isCatchClause(current)) continue;
+    const tryBlock = current.parent.tryBlock;
+    return writes.filter((w) => !(isInside(w.node, tryBlock) && inTransactionWithin(w.node, tryBlock)));
+  }
+  return writes;
+}
+
+/** The exits that leave after a write (or a call to a same-file writer) with no clear in between. */
+function unclearedExits(events: ScopeEvents, writers: ReadonlySet<string>): { exit: ts.Node; write: Event }[] {
+  const writes = [...events.writes, ...events.calls.filter((call) => writers.has(call.text))];
+  const out: { exit: ts.Node; write: Event }[] = [];
+  for (const exit of events.exits) {
+    const before = rolledBackBy(exit, writes).filter((w) => w.node.getEnd() <= exit.getEnd());
+    if (before.length === 0) continue;
+    const last = before.reduce((a, b) => (b.node.getEnd() > a.node.getEnd() ? b : a));
+    const cleared = events.clears.some((c) => c.getStart() > last.node.getEnd() && c.getStart() < exit.getEnd());
+    if (!cleared) out.push({ exit, write: last });
+  }
+  return out;
+}
+
+/** Same-file helpers that leave a write uncleared but are called by another function here. */
+function deferredWriters(scopes: readonly ScopeEvents[]): Set<string> {
+  const writers = new Set<string>();
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const events of scopes) {
+      if (!events.name || writers.has(events.name) || unclearedExits(events, writers).length === 0) continue;
+      const calledHere = scopes.some((other) => other !== events && other.calls.some((call) => call.text === events.name));
+      if (calledHere) { writers.add(events.name); grew = true; }
+    }
+  }
+  return writers;
+}
+
+/** `file:line` of each exit that leaves after a watched admin write with no clear in between. */
+export function findUnclearedAdminExits(source: string, watched: string[], fileName = "source.ts"): string[] {
+  const pattern = adminWriteRegex(source, watched, "");
+  if (!pattern) return [];
+  const sf = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const scopes = [...collectScopeEvents(sf, new RegExp(`^${pattern.source}$`)).values()];
+  const writers = deferredWriters(scopes);
+  const lineOf = (node: ts.Node, end = false) => sf.getLineAndCharacterOfPosition(end ? node.getEnd() : node.getStart()).line + 1;
+  return scopes
+    .filter((events) => !(events.name && writers.has(events.name)))
+    .flatMap((events) => unclearedExits(events, writers))
+    .map(({ exit, write }) => `${fileName}:${lineOf(exit, true)} exits after ${write.text} (line ${lineOf(write.node)}) with no clear`);
+}
+
+/** Every uncleared exit in the tree, skipping exempted files. */
+export function findUnclearedAdminExitsInTree(root = ROOT): string[] {
+  const watched = watchedModels();
+  const exemptions = loadExemptions();
+  const offenders: string[] = [];
+  for (const file of sourceFiles(root)) {
+    const relative = path.relative(root, file).split(path.sep).join("/");
+    if (isTestPath(relative) || Object.hasOwn(exemptions, `src/${relative}`)) continue;
+    offenders.push(...findUnclearedAdminExits(readFileSync(file, "utf8"), watched, `src/${relative}`));
+  }
+  return offenders.sort();
+}
+
+describe("prismaAdmin write-through guard, per function exit", () => {
+  const watched = watchedModels();
+
+  it("every exit after a watched prismaAdmin write passes a clear first", () => {
+    const offenders = findUnclearedAdminExitsInTree();
+    assert.deepEqual(offenders, [], "Clear the student's chat context before these exits:\n  " + offenders.join("\n  "));
+  });
+
+  it("flags a branch that writes and returns without the clear another branch makes", () => {
+    // The shape of the provision.ts gap: the existing-student branch wrote an
+    // enrollment and returned; only the new-student branch cleared.
+    const source = `import { prismaAdmin as prisma } from "@/lib/db";
+      export async function provision(existing: string | null) {
+        if (existing) {
+          await prisma.studentClassEnrollment.create({ data: {} });
+          return "updated";
+        }
+        await prisma.$transaction(async (tx) => {
+          await tx.orientationProgress.createMany({ data: [] });
+          return 1;
+        });
+        invalidateChatContext("s1");
+        return "provisioned";
+      }`;
+    const offenders = findUnclearedAdminExits(source, watched);
+    assert.equal(offenders.length, 1, offenders.join("\n"));
+    assert.match(offenders[0], /:5 exits after prisma\.studentClassEnrollment\.create/);
+  });
+
+  it("accepts a clear between the write and the exit, and a transaction callback's own return", () => {
+    const source = `import { prismaAdmin } from "@/lib/db";
+      export async function save() {
+        await prismaAdmin.$transaction(async (tx) => {
+          await tx.goal.update({ where: {}, data: {} });
+          return 1;
+        });
+        invalidateAllChatContext();
+      }`;
+    assert.deepEqual(findUnclearedAdminExits(source, watched), []);
+  });
+
+  it("flags falling off the end, and a write returned straight to the caller", () => {
+    const source = `import { prismaAdmin } from "@/lib/db";
+      async function a() { await prismaAdmin.goal.update({ where: {}, data: {} }); }
+      async function b() { invalidateChatContext("s"); return prismaAdmin.goal.delete({ where: {} }); }`;
+    assert.equal(findUnclearedAdminExits(source, watched).length, 2);
+  });
+
+  it("checks a same-file helper's callers instead of the helper, and still flags a caller that forgets", () => {
+    const source = `import { prismaAdmin } from "@/lib/db";
+      function insert(tx) { return tx.goal.create({ data: {} }); }
+      async function writeAll() { return prismaAdmin.$transaction(async (tx) => insert(tx)); }
+      export async function good() { await writeAll(); invalidateChatContext("s"); }
+      export async function bad() { await writeAll(); return "done"; }`;
+    const offenders = findUnclearedAdminExits(source, watched);
+    assert.equal(offenders.length, 1, offenders.join("\n"));
+    assert.match(offenders[0], /:5 exits after writeAll/);
+  });
+
+  it("lets a catch return out of a rolled-back transaction, but not out of a plain write", () => {
+    const source = `import { prismaAdmin } from "@/lib/db";
+      export async function a() {
+        try { await prismaAdmin.$transaction(async (tx) => tx.goal.create({ data: {} })); }
+        catch { return; }
+        invalidateChatContext("s");
+      }
+      export async function b() {
+        try { await prismaAdmin.goal.create({ data: {} }); await later(); }
+        catch { return; }
+        invalidateChatContext("s");
+      }`;
+    const offenders = findUnclearedAdminExits(source, watched);
+    assert.equal(offenders.length, 1, offenders.join("\n"));
+    assert.match(offenders[0], /:9 exits after prismaAdmin\.goal\.create/);
+  });
+});
+
 describe("prismaAdmin chat-context write-through guard", () => {
   it("every prismaAdmin write to a watched model sits in a file that invalidates chat context", () => {
     const offenders = findUninvalidatedAdminWrites();
@@ -233,7 +497,7 @@ describe("prismaAdmin chat-context write-through guard", () => {
     // A model deliberately NOT watched (chat-context-write-through.ts documents
     // why) must not creep in, or the guard would start demanding invalidation
     // for writes nothing caches.
-    assert.ok(!watched.includes("Message"), "Message is deliberately not watched");
+    assert.ok(!watched.includes("ProgressionEvent"), "ProgressionEvent is deliberately not watched");
   });
 
   it("actually scans real source (guards against an empty glob passing vacuously)", () => {
@@ -280,7 +544,7 @@ describe("prismaAdmin chat-context write-through guard", () => {
       const source = `import { prisma, prismaAdmin } from "@/lib/db";
         await prisma.appointment.update({ where: {}, data: {} });
         await prismaAdmin.appointment.findMany({});
-        await prismaAdmin.message.create({ data: {} });`;
+        await prismaAdmin.progressionEvent.create({ data: {} });`;
       assert.deepEqual(findAdminWatchedWrites(source, watched), []);
     });
 

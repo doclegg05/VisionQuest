@@ -393,6 +393,11 @@ export async function provisionIntakeStudent(
       }
     }
 
+    // prismaAdmin skips the write-through, so the enrollment and record
+    // written above must drop the student's kept context by hand, as the
+    // new-student path below does.
+    invalidateChatContext(student.id);
+
     const pdfStorageKey = await stampPacket(student.id, student.studentId, payload);
 
     await tryLogAuditEvent({
@@ -401,7 +406,7 @@ export async function provisionIntakeStudent(
       action: "student.intake.updated",
       targetType: "student",
       targetId: student.id,
-      summary: `Staff-authenticated intake updated records for existing student ${student.studentId}.`,
+      summary: `Staff-authenticated intake updated records for an existing student.`,
       metadata: { county: payload.county, source },
     });
 
@@ -429,7 +434,7 @@ export async function provisionIntakeStudent(
   // until staff issues a password out of band, and there is no secret in scope
   // for the anonymous response to print (review finding B2).
   const temporaryPassword = source === "staff" ? generateTemporaryPassword() : null;
-  const passwordHash = temporaryPassword ? hashPassword(temporaryPassword).hash : null;
+  const passwordHash = temporaryPassword ? (await hashPassword(temporaryPassword)).hash : null;
 
   const { student, spokesRecord } = await prisma.$transaction(async (tx) => {
     // 1. Create Student
@@ -533,7 +538,7 @@ export async function provisionIntakeStudent(
     action: "student.intake.provisioned",
     targetType: "student",
     targetId: student.id,
-    summary: `Automated intake provisioned new student ${student.studentId} in ${activeClass?.name || payload.county}.`,
+    summary: `Automated intake provisioned a new student in ${activeClass?.name || payload.county}.`,
     metadata: {
       county: payload.county,
       classId: activeClass?.id,

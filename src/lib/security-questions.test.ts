@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import test from "node:test";
-import { hashSecurityAnswer, verifySecurityAnswer } from "./security-question-auth";
+import { hashSecurityAnswer, hashSecurityAnswers, verifySecurityAnswer } from "./security-question-auth";
 import {
   createEmptySecurityQuestionAnswers,
   hasConfiguredSecurityQuestionSet,
@@ -41,22 +41,38 @@ test("validateSecurityQuestionAnswers accepts a full answer set", () => {
   assert.equal(answers.favorite_teacher, "Jones");
 });
 
-test("verifySecurityAnswer matches normalized answers", () => {
-  const stored = hashSecurityAnswer("St. Mary's");
+test("verifySecurityAnswer matches normalized answers", async () => {
+  const stored = await hashSecurityAnswer("St. Mary's");
 
-  assert.ok(verifySecurityAnswer("st marys", stored));
-  assert.ok(!verifySecurityAnswer("washington", stored));
+  assert.equal(await verifySecurityAnswer("st marys", stored), true);
+  assert.equal(await verifySecurityAnswer("washington", stored), false);
 });
 
-test("verifySecurityAnswer runs the KDF and never matches when no usable hash is stored", (t) => {
-  const scrypt = t.mock.method(crypto, "scryptSync");
+test("verifySecurityAnswer runs the KDF and never matches when no usable hash is stored", async (t) => {
+  // The dummy hash is started when the auth module loads. Wait for it, so its
+  // own KDF is not counted below.
+  await verifySecurityAnswer("st marys", null);
+  const scrypt = t.mock.method(crypto, "scrypt");
 
   for (const stored of [undefined, null, "", "not-a-hash"]) {
-    assert.equal(verifySecurityAnswer("st marys", stored), false);
+    assert.equal(await verifySecurityAnswer("st marys", stored), false);
   }
 
   // One dummy-hash KDF per answer, so a missing hash costs what a real one does.
   assert.equal(scrypt.mock.callCount(), 4);
+});
+
+test("hashSecurityAnswers hashes every answer under its own question", async () => {
+  const hashed = await hashSecurityAnswers({
+    birth_city: "Cleveland",
+    elementary_school: "Lincoln",
+    favorite_teacher: "Jones",
+  });
+
+  assert.deepEqual(hashed.map((item) => item.questionKey), ["birth_city", "elementary_school", "favorite_teacher"]);
+  assert.equal(await verifySecurityAnswer("cleveland", hashed[0]?.answerHash), true);
+  assert.equal(await verifySecurityAnswer("lincoln", hashed[1]?.answerHash), true);
+  assert.equal(await verifySecurityAnswer("cleveland", hashed[2]?.answerHash), false);
 });
 
 test("hasConfiguredSecurityQuestionSet only passes when every preset key is present", () => {
