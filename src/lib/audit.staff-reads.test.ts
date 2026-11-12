@@ -2,90 +2,68 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, it } from "node:test";
+import { classifyGetRoute } from "./staff-read-walk";
 
 /**
  * Every staff GET that returns one student's record writes a view row
  * through `recordStudentView` (src/lib/audit.ts). Students are TANF/SNAP
  * recipients, and who looked at whose record is a compliance expectation.
  *
- * A route is in scope when its path carries a student id segment
- * (`students/[id]`) or it is listed in `ONE_STUDENT_ROUTES` (routes whose id
- * names a row that belongs to one student). Its GET handler must call
- * `recordStudentView`, or appear in `EXEMPT` with a reason.
+ * The walk reads every route under src/app/api. A GET is in scope when it
+ * reaches a staff-on-student guard (`assertStaffCanManageStudent`,
+ * `staffCanManageStudent`), reads `?studentId=`, or sits under a
+ * `students/[id]` path; see `classifyGetRoute` (src/lib/staff-read-walk.ts).
+ * Comments are stripped before matching. Each in-scope GET must reach
+ * `recordStudentView` or appear in `EXEMPT` with a reason.
+ *
+ * Set STAFF_READ_WALK_ROOT to walk another tree (used to prove the walk
+ * fails on a scratch copy with a new unaudited route).
  */
 
-const STAFF_API_ROOTS = ["src/app/api/teacher", "src/app/api/admin", "src/app/api/coordinator"];
+const API_ROOT = process.env.STAFF_READ_WALK_ROOT ?? "src/app/api";
 
-const STUDENT_ID_SEGMENT = /\/students\/\[id\]\//u;
+/** In-scope GETs that record no view. Every entry needs a one-line reason. */
+const EXEMPT: Readonly<Record<string, string>> = {};
 
-/** Routes whose dynamic id is not a student id but still names one student's data. */
-const ONE_STUDENT_ROUTES: ReadonlySet<string> = new Set([
-  "src/app/api/teacher/failed-extractions/[id]/route.ts",
-  "src/app/api/teacher/failed-extractions/route.ts",
-  "src/app/api/teacher/forms/responses/[id]/route.ts",
-]);
+/** The walk must keep finding at least this many routes, or its matching broke. */
+const MIN_IN_SCOPE = 18;
 
-/** In-scope GETs that record no view. Every entry needs a reason. */
-const EXEMPT: Readonly<Record<string, string>> = {
-  "src/app/api/teacher/failed-extractions/route.ts":
-    "Lists open failures across every managed student: name, kind, date and status only. " +
-    "It returns no conversation text and no error text; the detail route returns those and records the read.",
-};
-
-function staffRouteFiles(): string[] {
-  return STAFF_API_ROOTS.flatMap((root) =>
-    readdirSync(path.join(process.cwd(), root), { recursive: true, encoding: "utf8" })
-      .filter((file) => path.basename(file) === "route.ts")
-      .map((file) => path.join(root, file)),
-  ).sort();
+function routeFiles(): string[] {
+  return readdirSync(path.resolve(API_ROOT), { recursive: true, encoding: "utf8" })
+    .filter((file) => path.basename(file) === "route.ts")
+    .map((file) => path.join(API_ROOT, file))
+    .sort();
 }
 
-/** The source of the exported GET handler, up to the next export. */
-function getHandlerSource(source: string): string | null {
-  const start = source.search(/export (const|async function) GET\b/u);
-  if (start === -1) return null;
-  const rest = source.slice(start + 1);
-  const next = rest.search(/\nexport (const|async function) /u);
-  return next === -1 ? rest : rest.slice(0, next);
-}
-
-function inScope(file: string): boolean {
-  return STUDENT_ID_SEGMENT.test(file) || ONE_STUDENT_ROUTES.has(file);
-}
-
-function scopedGetRoutes(): Map<string, string> {
-  const routes = new Map<string, string>();
-  for (const file of staffRouteFiles()) {
-    if (!inScope(file)) continue;
-    const handler = getHandlerSource(readFileSync(file, "utf8"));
-    if (handler !== null) routes.set(file, handler);
+function inScopeRoutes(): Map<string, { records: boolean; why: string[] }> {
+  const routes = new Map<string, { records: boolean; why: string[] }>();
+  for (const file of routeFiles()) {
+    const result = classifyGetRoute(file, readFileSync(file, "utf8"));
+    if (result.kind === "in_scope") routes.set(file, { records: result.records, why: result.why });
   }
   return routes;
 }
 
 describe("staff reads of one student's record are audited", () => {
-  const routes = scopedGetRoutes();
+  const routes = inScopeRoutes();
 
   it("finds the routes it guards", () => {
-    assert.ok(routes.size >= 14, `expected at least 14 one-student staff GETs, found ${routes.size}`);
-    for (const file of ONE_STUDENT_ROUTES) {
-      assert.ok(routes.has(file), `${file} is listed but has no GET handler`);
-    }
+    assert.ok(routes.size >= MIN_IN_SCOPE, `expected at least ${MIN_IN_SCOPE} in-scope GETs, found ${routes.size}`);
   });
 
-  for (const [file, handler] of routes) {
-    it(`${file} GET calls recordStudentView or is exempt with a reason`, () => {
+  for (const [file, route] of routes) {
+    it(`${file} GET records a view or is exempt with a reason`, () => {
       if (file in EXEMPT) return;
-      assert.match(handler, /recordStudentView\(/u, `${file} GET returns one student's data and records no view`);
+      assert.ok(route.records, `${file} GET (${route.why.join("; ")}) records no view`);
     });
   }
 
   it("every exemption has a reason and a route that needs it", () => {
     for (const [file, reason] of Object.entries(EXEMPT)) {
       assert.ok(reason.trim().length > 0, `${file} is exempt with no reason`);
-      const handler = routes.get(file);
-      assert.ok(handler !== undefined, `${file} is exempt but is not an in-scope GET route`);
-      assert.doesNotMatch(handler, /recordStudentView\(/u, `${file} records a view, so its exemption is stale`);
+      const route = routes.get(file);
+      assert.ok(route !== undefined, `${file} is exempt but is not an in-scope GET route`);
+      assert.equal(route.records, false, `${file} records a view, so its exemption is stale`);
     }
   });
 });

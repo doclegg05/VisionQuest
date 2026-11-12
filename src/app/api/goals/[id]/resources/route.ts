@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { forbidden, isStaffRole, notFound, withAuth } from "@/lib/api-error";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
+import { recordStudentView } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { buildGoalPlanEntries } from "@/lib/goal-plan";
 import { serializeGoalPlanEntries, toGoalResourceLinkView } from "@/lib/goal-resource-links";
@@ -29,7 +30,13 @@ export const GET = withAuth(async (
   }
 
   if (isStaffRole(session.role)) {
-    await assertStaffCanManageStudent(session, goal.studentId);
+    const student = await assertStaffCanManageStudent(session, goal.studentId);
+    await recordStudentView({
+      actorId: session.id,
+      actorRole: session.role,
+      targetStudentId: student.id,
+      surface: "goal_resources",
+    });
   } else if (goal.studentId !== session.id) {
     throw forbidden();
   }

@@ -79,7 +79,17 @@ export type StudentViewSurface =
   /** Pathway suggestions for one of the student's goals. */
   | "pathway"
   /** One failed extraction's stored conversation snapshot. */
-  | "failed_extraction";
+  | "failed_extraction"
+  /** A file or signed form the student uploaded, downloaded by staff. */
+  | "files"
+  /** What Sage has noted about the student (`/api/sage/insights`). */
+  | "insights"
+  /** The student's orientation checklist progress. */
+  | "orientation"
+  /** One goal's linked resources and plan. */
+  | "goal_resources"
+  /** The verified student record Sage reads for a staff chat. */
+  | "sage_chat";
 
 /**
  * Surfaces written on every read instead of once a day. The archive download
@@ -98,6 +108,11 @@ interface StudentViewInput {
 
 const STUDENT_VIEW_ACTION_PREFIX = "teacher.student.view";
 
+/** Whether the view is on record (written now, or already written today). */
+export interface StudentViewResult {
+  recorded: boolean;
+}
+
 /**
  * Audit a staff READ of a student's data (students are TANF/SNAP recipients —
  * who viewed whose data is a compliance expectation, not just who changed it).
@@ -107,28 +122,17 @@ const STUDENT_VIEW_ACTION_PREFIX = "teacher.student.view";
  * day is always recorded, so nothing is concealed. Surfaces in
  * `UNSAMPLED_SURFACES` (the archive download) are written on every call.
  *
- * Fire-and-forget safe: never throws into the request path. Failures are
- * logged as warnings and swallowed.
+ * Never throws into the request path. A failed write on a sampled surface is
+ * a warning and the read goes on. A failed write on an unsampled surface is
+ * logged with `alert: "audit_write_failed"` (as `tryLogAuditEvent` does) and
+ * returns `{ recorded: false }`: the caller must then refuse to hand over the
+ * file, because that download would leave no trace at all.
  */
-export async function recordStudentView(input: StudentViewInput): Promise<void> {
+export async function recordStudentView(input: StudentViewInput): Promise<StudentViewResult> {
+  const unsampled = UNSAMPLED_SURFACES.has(input.surface);
   try {
     const action = `${STUDENT_VIEW_ACTION_PREFIX}.${input.surface}`;
-
-    if (!UNSAMPLED_SURFACES.has(input.surface)) {
-      const startOfToday = new Date();
-      startOfToday.setHours(0, 0, 0, 0);
-
-      const existing = await prisma.auditLog.findFirst({
-        where: {
-          actorId: input.actorId,
-          action,
-          targetId: input.targetStudentId,
-          createdAt: { gte: startOfToday },
-        },
-        select: { id: true },
-      });
-      if (existing) return;
-    }
+    if (!unsampled && (await viewedToday(input, action))) return { recorded: true };
 
     await logAuditEvent({
       actorId: input.actorId,
@@ -139,15 +143,41 @@ export async function recordStudentView(input: StudentViewInput): Promise<void> 
       summary: `Viewed student data (${input.surface}).`,
       metadata: { surface: input.surface },
     });
+    return { recorded: true };
   } catch (error: unknown) {
-    // Read auditing must never break or delay the request that triggered it.
     // No student identifier here: server logs must stay PII-free
     // (.claude/rules/security.md); actor + surface localize the failure.
-    logger.warn("recordStudentView failed", {
-      actorId: input.actorId,
-      actorRole: input.actorRole,
-      surface: input.surface,
-      error: errorForLog(error),
-    });
+    if (unsampled) {
+      logger.error("recordStudentView failed", {
+        alert: "audit_write_failed",
+        actorId: input.actorId,
+        actorRole: input.actorRole,
+        surface: input.surface,
+        error: errorForLog(error),
+      });
+    } else {
+      logger.warn("recordStudentView failed", {
+        actorId: input.actorId,
+        actorRole: input.actorRole,
+        surface: input.surface,
+        error: errorForLog(error),
+      });
+    }
+    return { recorded: false };
   }
+}
+
+async function viewedToday(input: StudentViewInput, action: string): Promise<boolean> {
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const existing = await prisma.auditLog.findFirst({
+    where: {
+      actorId: input.actorId,
+      action,
+      targetId: input.targetStudentId,
+      createdAt: { gte: startOfToday },
+    },
+    select: { id: true },
+  });
+  return existing !== null;
 }

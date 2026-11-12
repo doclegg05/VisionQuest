@@ -115,7 +115,7 @@ export const POST = withAuth(
       action: "teacher.student.reassign_class",
       targetType: "student",
       targetId: studentId,
-      summary: `Reassigned ${student.displayName} to ${targetClass.name}`,
+      summary: `Reassigned the student to ${targetClass.name}.`,
       metadata: {
         oldClassId: currentEnrollment?.classId ?? null,
         newClassId: body.newClassId,

@@ -30,7 +30,8 @@ export const POST = withTeacherAuth(async (session, _req: NextRequest, ctx: unkn
       action: "teacher.student.archive",
       targetType: "student",
       targetId: studentId,
-      summary: `Archived ${fileCount} files for ${student.displayName}`,
+      // Count only: audit summaries carry no student name.
+      summary: `Archived ${fileCount} files.`,
       metadata: { storageKey, fileCount },
     });
 
@@ -63,14 +64,23 @@ export const GET = withTeacherAuth(async (session, req: NextRequest, ctx: unknow
 
   // The archive is the whole record (every chat, file and form), so each
   // download writes its own view row: "archive" is unsampled in
-  // recordStudentView. Recorded only once the file is handed over.
-  const recordDownload = () =>
-    recordStudentView({
+  // recordStudentView. The row is written before the file is handed over,
+  // and a download whose row cannot be written is refused (fail closed):
+  // recordStudentView has already raised the audit_write_failed alert.
+  const recordDownload = async (): Promise<boolean> => {
+    const { recorded } = await recordStudentView({
       actorId: session.id,
       actorRole: session.role,
       targetStudentId: studentId,
       surface: "archive",
     });
+    return recorded;
+  };
+  const unrecorded = () =>
+    NextResponse.json(
+      { error: "The download could not be logged, so it was stopped. Please try again." },
+      { status: 500 },
+    );
 
   // Archives can be 50-100MB — presigned URL bypasses Node.js memory entirely.
   const presigned = await getPresignedDownloadUrl(storageKey, {
@@ -78,7 +88,7 @@ export const GET = withTeacherAuth(async (session, req: NextRequest, ctx: unknow
     contentDisposition: disposition,
   });
   if (presigned) {
-    await recordDownload();
+    if (!(await recordDownload())) return unrecorded();
     return NextResponse.redirect(presigned, 302);
   }
 
@@ -86,7 +96,7 @@ export const GET = withTeacherAuth(async (session, req: NextRequest, ctx: unknow
   if (!result) {
     return NextResponse.json({ error: "Archive not found." }, { status: 404 });
   }
-  await recordDownload();
+  if (!(await recordDownload())) return unrecorded();
 
   return new Response(new Uint8Array(result.buffer), {
     headers: {

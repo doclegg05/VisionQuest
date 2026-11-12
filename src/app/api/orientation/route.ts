@@ -5,6 +5,7 @@ import { syncStudentAlerts } from "@/lib/advising";
 import { deferPerStudent } from "@/lib/after-response";
 import { withAuth, badRequest, forbidden, isStaffRole, type Session } from "@/lib/api-error";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
+import { recordStudentView } from "@/lib/audit";
 import { applyStudentOrientationCompletion } from "@/lib/orientation-completion";
 import { isVerificationRequiredItem } from "@/lib/orientation-step-resources";
 import { parseBody } from "@/lib/schemas";
@@ -46,6 +47,16 @@ async function resolveTargetStudentId(session: Session, requestedStudentId?: str
 export const GET = withAuth(async (session, req: Request) => {
   const { searchParams } = new URL(req.url);
   const targetStudentId = await resolveTargetStudentId(session, searchParams.get("studentId"));
+
+  if (targetStudentId !== session.id) {
+    // A staff read of another student's orientation: write the view row.
+    await recordStudentView({
+      actorId: session.id,
+      actorRole: session.role,
+      targetStudentId,
+      surface: "orientation",
+    });
+  }
 
   const items = await prisma.orientationItem.findMany({
     orderBy: { sortOrder: "asc" },

@@ -25,7 +25,9 @@ const GOAL_ID = "cgoal0000000000000000001";
 type TestSession = { id: string; studentId: string; displayName: string; role: string; demoAccount?: "instructor" };
 let session: TestSession | null = null;
 
-const auditCreates: Array<{ action: string; targetId: string | null; actorId: string | null }> = [];
+const auditCreates: Array<{ action: string; targetId: string | null; actorId: string | null; summary?: string | null }> = [];
+/** When true, every AuditLog insert throws, as a database outage would. */
+let failAuditWrites = false;
 
 /** What the database returns for a staff lookup of the student, applying the where clause. */
 function managedStudentLookup(args: any) {
@@ -89,6 +91,7 @@ const fakePrismaAdmin = {
         (row) => row.actorId === args.where.actorId && row.action === args.where.action && row.targetId === args.where.targetId,
       ) ?? null,
     create: async (args: any) => {
+      if (failAuditWrites) throw new Error("audit insert failed");
       auditCreates.push(args.data);
       return { id: `audit-${auditCreates.length}` };
     },
@@ -98,6 +101,7 @@ const fakePrismaAdmin = {
 type GetHandler = (req: Request, ctx: { params: Promise<Record<string, string>> }) => Promise<Response>;
 
 const handlers: Record<string, GetHandler> = {};
+let archivePost: GetHandler;
 
 before(async () => {
   const realAuth = await import("@/lib/auth");
@@ -127,6 +131,7 @@ before(async () => {
 
   const load = async (path: string): Promise<GetHandler> => (await import(path)).GET as GetHandler;
   handlers.archive = await load("./students/[id]/archive/route");
+  archivePost = (await import("./students/[id]/archive/route")).POST as GetHandler;
   handlers.memories = await load("./students/[id]/memories/route");
   handlers.mood = await load("./students/[id]/mood/route");
   handlers.notes = await load("./students/[id]/notes/route");
@@ -145,6 +150,7 @@ function teacher(id: string): TestSession {
 
 beforeEach(() => {
   auditCreates.length = 0;
+  failAuditWrites = false;
   session = teacher(OWNER_TEACHER);
   failedExtractionRow = {
     id: ROW_ID,
@@ -276,13 +282,52 @@ describe("archive downloads are each recorded", () => {
 });
 
 describe("GET /api/teacher/failed-extractions/[id] returns the one row", () => {
-  it("returns the stored conversation snapshot and the error for a managed student", async () => {
-    const res = await call(ROUTES[ROUTES.length - 1]);
+  const detail = () => ROUTES[ROUTES.length - 1];
+
+  it("returns the error without the conversation snapshot by default", async () => {
+    const res = await call(detail());
     const body = await res.json();
 
     assert.equal(body.success, true);
     assert.equal(body.data.id, ROW_ID);
     assert.equal(body.data.error, "SyntaxError");
+    assert.equal("payload" in body.data, false);
+    assert.doesNotMatch(JSON.stringify(body), /I want my GED/u);
+  });
+
+  it("returns the snapshot only on ?include=payload, and still records the view", async () => {
+    const res = await call(detail(), { url: "/x?include=payload" });
+    const body = await res.json();
+
     assert.match(body.data.payload, /I want my GED/u);
+    assert.deepEqual(viewRows().map((row) => row.action), ["teacher.student.view.failed_extraction"]);
+  });
+});
+
+describe("an archive download whose view row cannot be written is refused", () => {
+  it("answers 500 instead of the redirect", async () => {
+    failAuditWrites = true;
+    const res = await call(ROUTES[0]);
+    assert.equal(res.status, 500);
+    assert.equal(res.headers.get("location"), null);
+  });
+
+  it("a sampled surface still answers when its view row cannot be written", async () => {
+    failAuditWrites = true;
+    const res = await call(ROUTES.find((route) => route.handler === "memories") as RouteCase);
+    assert.equal(res.status, 200);
+  });
+});
+
+describe("POST /api/teacher/students/[id]/archive audit row", () => {
+  it("counts the files and carries no student name", async () => {
+    const res = await archivePost(new Request("http://localhost/x", { method: "POST" }), {
+      params: Promise.resolve({ id: STUDENT.id }),
+    });
+    assert.equal(res.status, 200);
+    const row = auditCreates.find((entry) => entry.action === "teacher.student.archive");
+    assert.ok(row);
+    assert.equal(row.summary, "Archived 0 files.");
+    assert.ok(!String(row.summary).includes(STUDENT.displayName));
   });
 });
