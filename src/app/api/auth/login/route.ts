@@ -40,8 +40,9 @@ import {
  * FAILED sign-ins one network address may make per window. A right password
  * gives its unit back, so a classroom of 30 on one address can all sign in;
  * 30 leaves each of them one mistyped try. This bucket slows one address
- * guessing across many accounts. It is a courtesy limit: the address comes
- * from `X-Forwarded-For`, which a caller can set (src/lib/client-ip.ts).
+ * guessing across many accounts. The address is the hop the platform's proxy
+ * appended to `X-Forwarded-For`, not the first one the caller wrote
+ * (src/lib/client-ip.ts, readiness A6).
  *
  * An attempt holds its unit until it is answered, so failed attempts plus
  * attempts in flight can never pass 30. More than 30 sign-ins from one
@@ -73,6 +74,22 @@ function unknownLoginLimiterKey(normalizedLogin: string): string {
     .update(`login-limiter:${normalizedLogin}`)
     .digest("hex");
   return `login:unknown:${digest}`;
+}
+
+/** Hex characters of the audit hash kept: enough to group tries, too short to be a lookup table key. */
+const LOGIN_AUDIT_HASH_CHARS = 16;
+
+/**
+ * What the audit row keeps of a login that names no account (readiness A6).
+ * People paste a password into the username box, so the typed text is never
+ * stored. A keyed hash under its own label lets staff see repeated tries of
+ * the same login without anyone being able to read or guess it back.
+ */
+function unknownLoginAuditHash(normalizedLogin: string): string {
+  return createHmac("sha256", getJwtSecret())
+    .update(`login-audit:${normalizedLogin}`)
+    .digest("hex")
+    .slice(0, LOGIN_AUDIT_HASH_CHARS);
 }
 
 /** Built fresh per request so no caller can change the shared answer. */
@@ -130,6 +147,7 @@ async function countAccountAttempt(student: Student | null, normalizedLogin: str
 
 interface FailedSignIn {
   login: string;
+  normalizedLogin: string;
   ip: string;
   student: Student | null;
   accountLocked: boolean;
@@ -140,7 +158,8 @@ interface FailedSignIn {
  * The response says nothing the caller could not already guess; the audit
  * log, which only staff read, keeps the three cases apart.
  */
-async function auditFailedSignIn({ login, ip, student, accountLocked, isOAuthOnly }: FailedSignIn): Promise<void> {
+async function auditFailedSignIn(attempt: FailedSignIn): Promise<void> {
+  const { student, accountLocked, isOAuthOnly } = attempt;
   const failureStudent = accountLocked || isOAuthOnly ? student : null;
   const action = accountLocked
     ? "auth.login_failed_rate_limited"
@@ -153,11 +172,31 @@ async function auditFailedSignIn({ login, ip, student, accountLocked, isOAuthOnl
     action,
     targetType: "student",
     targetId: failureStudent?.id,
+    ...failedSignInRecord(attempt),
+  });
+}
+
+/**
+ * The summary and metadata of a failed sign-in. A login that names an account
+ * is not secret and is kept as typed; one that names no account is kept only
+ * as a hash, because it may be a password typed in the wrong box.
+ */
+function failedSignInRecord({ login, normalizedLogin, ip, student, accountLocked }: FailedSignIn): {
+  summary: string;
+  metadata: Record<string, string>;
+} {
+  if (!student) {
+    return {
+      summary: "Failed login attempt for a login that names no account.",
+      metadata: { ip, loginHash: unknownLoginAuditHash(normalizedLogin) },
+    };
+  }
+  return {
     summary: accountLocked
       ? `Failed login attempt for "${login}" — refused, per-account attempt limit reached.`
       : `Failed login attempt for "${login}".`,
     metadata: { ip },
-  });
+  };
 }
 
 /**
@@ -274,7 +313,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     !student || !student.passwordHash || !passwordMatches || !student.isActive;
 
   if (accountLocked || isOAuthOnly || isInvalidCredentials) {
-    await auditFailedSignIn({ login, ip, student, accountLocked, isOAuthOnly });
+    await auditFailedSignIn({ login, normalizedLogin, ip, student, accountLocked, isOAuthOnly });
     return signInFailed();
   }
 
