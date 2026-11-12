@@ -177,8 +177,8 @@ If you do not use the blueprint:
 | `API_KEY_ENCRYPTION_KEY` | Base64-encoded 32-byte key |
 | `APP_BASE_URL` | Public Render URL |
 | `CRON_SECRET` | Shared secret for internal scheduled routes |
-| `TRUSTED_PROXY_HOPS` | How many proxies append to `X-Forwarded-For` before the app. Default `1` (Render's proxy). The per-network sign-in and recovery limits count the entry that many places from the right, never the first entry, which the caller writes. A value that is not a whole number from 1 to 10 stops the boot |
-| `CLOUDFLARE_IN_FRONT` | `true` only when every request comes through a Cloudflare zone of our own; the limits then count `CF-Connecting-IP`. Default off (`false` or unset), because without Cloudflare in front a caller can send that header itself. Any other value stops the boot |
+| `TRUSTED_PROXY_HOPS` | How many proxies append to `X-Forwarded-For` before the app. Default `2`: Render serves onrender.com through Cloudflare, so the chain is client, Cloudflare edge, Render's proxy, app, and the client is 2 entries from the right. The per-network sign-in and recovery limits count that entry, never the first entry, which the caller writes. Too low (`1`) counts the Cloudflare edge, so every student behind one edge shares a limit; too high (`3` or more) reaches entries the caller wrote, so the address can be forged. Confirm it with [Check the sign-in limits' client address](#check-the-sign-in-limits-client-address). A value that is not a whole number from 1 to 10 stops the boot |
+| `CLOUDFLARE_IN_FRONT` | `true` makes the limits count `CF-Connecting-IP`, which Cloudflare sets to the client on every request it proxies (Cloudflare sits in front of Render's own domain). Default off (`false` or unset): turn it on only after the check below shows that header holds the real client and no request can reach Render without passing Cloudflare, because a request that skipped Cloudflare could carry a header the caller wrote. Any other value stops the boot |
 | `STORAGE_ENDPOINT` | Supabase S3 endpoint |
 | `STORAGE_REGION` | Usually `us-east-1` |
 | `STORAGE_BUCKET` | `Uploads` (existing private bucket; case-sensitive) |
@@ -305,6 +305,37 @@ The script sets the role to `admin`, signs out the account's open sessions, and 
 - Password reset mail sends if SMTP is configured
 - Google OAuth callback works if enabled
 - Sentry receives test errors if configured
+
+### Check the sign-in limits' client address
+
+Run this after every deploy that changes `TRUSTED_PROXY_HOPS` or `CLOUDFLARE_IN_FRONT`, and once before launch. It tests that the address on a failed sign-in's audit row equals your real public address.
+
+1. From a classroom or home network, note the public addresses:
+
+   ```bash
+   curl -4 https://ifconfig.me
+   curl -6 https://ifconfig.me
+   ```
+
+2. Make one failed sign-in with a forged header and a fake login. The login matches no account, so no real student's limit is spent:
+
+   ```bash
+   curl -s -X POST https://visionquest.onrender.com/api/auth/login -H 'Origin: https://visionquest.onrender.com' -H 'Content-Type: application/json' -H 'X-Forwarded-For: 203.0.113.9' -d '{"studentId":"zz-address-check-0001","password":"not-a-real-password"}'
+   ```
+
+3. In the Supabase SQL editor:
+
+   ```sql
+   SELECT "createdAt", metadata FROM visionquest."AuditLog" WHERE action LIKE 'auth.login_failed%' ORDER BY "createdAt" DESC LIMIT 3;
+   ```
+
+4. Judge `metadata.ip` on the newest row:
+   - **Equal to the address from step 1**: correct.
+   - **`203.0.113.9`**: the address can be forged. Block launch; `TRUSTED_PROXY_HOPS` is too high.
+   - **A Cloudflare address**: `TRUSTED_PROXY_HOPS` is too low, and every student behind that edge shares one limit. Cloudflare's ranges are listed at https://www.cloudflare.com/ips/. As of 2026-11 they are IPv4 `173.245.48.0/20`, `103.21.244.0/22`, `103.22.200.0/22`, `103.31.4.0/22`, `141.101.64.0/18`, `108.162.192.0/18`, `190.93.240.0/20`, `188.114.96.0/20`, `197.234.240.0/22`, `198.41.128.0/17`, `162.158.0.0/15`, `104.16.0.0/13`, `104.24.0.0/14`, `172.64.0.0/13`, `131.0.72.0/22` and IPv6 `2400:cb00::/32`, `2606:4700::/32`, `2803:f800::/32`, `2405:b500::/32`, `2405:8100::/32`, `2a06:98c0::/29`, `2c0f:f248::/32`.
+   - **`unknown`**: the chain was shorter than `TRUSTED_PROXY_HOPS`. Lower it by one and check again.
+5. Repeat steps 1 to 4 from a second network (a phone hotspot), and again with `curl -6` in step 2. An IPv6 row must show the full address from `curl -6 https://ifconfig.me`; the limit itself counts that address's /64.
+6. Confirm the row holds `metadata.loginHash` and that the text `zz-address-check-0001` appears nowhere in it.
 
 ## 10. Monitoring And Recovery
 

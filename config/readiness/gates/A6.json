@@ -8,6 +8,7 @@
     "type": "test",
     "files": [
       "src/lib/client-ip.test.ts",
+      "src/lib/client-ip.docs.test.ts",
       "src/lib/env.client-ip.test.ts",
       "src/app/api/auth/login/__tests__/route.client-address.test.ts",
       "src/app/api/auth/reset-password/questions/__tests__/route.test.ts",
