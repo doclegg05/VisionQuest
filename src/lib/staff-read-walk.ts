@@ -2,18 +2,21 @@
  * Static classifier for the staff-read route walk (src/lib/audit.staff-reads.test.ts).
  *
  * A GET handler is in scope when it can reach a staff-on-student guard
- * (`assertStaffCanManageStudent`, `staffCanManageStudent`), reads a
- * `?studentId=` query parameter, or lives under a `students/[id]` path. It
- * "records" when it can reach `recordStudentView(`. Reach means the handler
- * calls the function itself or through a helper defined in the same file.
+ * (`assertStaffCanManageStudent`, `staffCanManageStudent`,
+ * `buildManagedStudentWhere`, or an exported src/lib helper that reaches one),
+ * reads a query parameter whose name contains "student", or lives under a
+ * `students/[id]` path. It "records" when it can reach `recordStudentView(`
+ * the same ways. Reach means the handler calls the function itself, through a
+ * helper defined in the same file, or hands a same-file function to a wrapper
+ * (`export const GET = withTeacherAuth(handler)`).
  *
  * Comments are stripped first, so a comment that names a function proves
  * nothing.
  */
 
-const GUARD_CALL = /\b(?:assertStaffCanManageStudent|staffCanManageStudent)\s*\(/u;
-const RECORD_CALL = /\brecordStudentView\s*\(/u;
-const STUDENT_ID_QUERY = /\.get\(\s*["'`]studentId["'`]\s*\)/u;
+const GUARD_NAMES = ["assertStaffCanManageStudent", "staffCanManageStudent", "buildManagedStudentWhere"];
+const RECORD_NAMES = ["recordStudentView"];
+const STUDENT_QUERY = /\.get\(\s*["'`]\w*student\w*["'`]\s*\)/iu;
 const STUDENT_PATH = /\/students\/\[id\]\//u;
 
 /** Block comments, then line comments that are not part of a URL like `https://`. */
@@ -46,13 +49,25 @@ export function topLevelChunks(source: string): TopLevelChunk[] {
   return chunks;
 }
 
-function callsName(body: string, name: string): boolean {
-  return new RegExp(`(?<![\\w$.])${name.replace(/\$/gu, "\\$")}\\s*\\(`, "u").test(body);
+function escapeName(name: string): string {
+  return name.replace(/\$/gu, "\\$");
 }
 
-/** Names of the chunks that reach `target`, directly or through other chunks. */
-function reaching(chunks: TopLevelChunk[], target: RegExp): Set<string> {
-  const found = new Set(chunks.filter((chunk) => target.test(chunk.body)).map((chunk) => chunk.name));
+/** A call `name(`, or `name` handed to another call as an argument. */
+function callsName(body: string, name: string): boolean {
+  const id = escapeName(name);
+  return new RegExp(`(?<![\\w$.])${id}\\s*\\(|[(,]\\s*${id}\\s*[,)]`, "u").test(body);
+}
+
+function callsAny(body: string, names: Iterable<string>): boolean {
+  for (const name of names) if (callsName(body, name)) return true;
+  return false;
+}
+
+/** Names of the chunks that reach one of `targets`, directly or through other chunks. */
+function reaching(chunks: TopLevelChunk[], targets: Iterable<string>): Set<string> {
+  const names = [...targets];
+  const found = new Set(chunks.filter((chunk) => callsAny(chunk.body, names)).map((chunk) => chunk.name));
   let grew = true;
   while (grew) {
     grew = false;
@@ -85,24 +100,71 @@ function reachableBodies(chunks: TopLevelChunk[], start: TopLevelChunk): string 
   return bodies;
 }
 
+/** Exported src/lib functions that reach a guard, and ones that reach a view write. */
+export interface LibReach {
+  guards: ReadonlySet<string>;
+  recorders: ReadonlySet<string>;
+}
+
+export interface SourceFile {
+  file: string;
+  source: string;
+}
+
+const NO_LIB: LibReach = { guards: new Set(), recorders: new Set() };
+
+/**
+ * Exported functions across `files` that reach one of `base`, directly, through
+ * same-file helpers, or through another file's exported function. Repeats
+ * until nothing new is found, so a chain of helpers across files counts.
+ */
+function exportedReaching(modules: TopLevelChunk[][], base: string[]): Set<string> {
+  const found = new Set<string>();
+  let grew = true;
+  while (grew) {
+    grew = false;
+    const targets = [...base, ...found];
+    for (const chunks of modules) {
+      for (const name of reaching(chunks, targets)) {
+        const chunk = chunks.find((c) => c.name === name);
+        if (chunk?.body.startsWith("export") && !found.has(name) && !base.includes(name)) {
+          found.add(name);
+          grew = true;
+        }
+      }
+    }
+  }
+  return found;
+}
+
+/** Build the guard and recorder lists from src/lib sources. */
+export function libReach(files: readonly SourceFile[]): LibReach {
+  const modules = files.map((f) => topLevelChunks(stripComments(f.source)));
+  return {
+    guards: exportedReaching(modules, GUARD_NAMES),
+    recorders: exportedReaching(modules, RECORD_NAMES),
+  };
+}
+
 export type GetRouteClass =
   | { kind: "no_get" }
   | { kind: "out_of_scope" }
   | { kind: "in_scope"; records: boolean; why: string[] };
 
 /** Classify one route file's GET handler. `file` is the repo-relative path. */
-export function classifyGetRoute(file: string, rawSource: string): GetRouteClass {
+export function classifyGetRoute(file: string, rawSource: string, lib: LibReach = NO_LIB): GetRouteClass {
   const chunks = topLevelChunks(stripComments(rawSource));
   const get = chunks.find((chunk) => chunk.name === "GET");
   if (!get) return { kind: "no_get" };
 
-  const guarded = reaching(chunks, GUARD_CALL);
+  const guarded = reaching(chunks, [...GUARD_NAMES, ...lib.guards]);
   const reached = reachableBodies(chunks, get);
   const why: string[] = [];
   if (guarded.has("GET")) why.push("calls a staff-on-student guard");
-  if (STUDENT_ID_QUERY.test(reached)) why.push("reads ?studentId=");
+  if (STUDENT_QUERY.test(reached)) why.push("reads a student query parameter");
   if (STUDENT_PATH.test(file)) why.push("students/[id] path");
   if (why.length === 0) return { kind: "out_of_scope" };
 
-  return { kind: "in_scope", records: reaching(chunks, RECORD_CALL).has("GET"), why };
+  const records = reaching(chunks, [...RECORD_NAMES, ...lib.recorders]).has("GET");
+  return { kind: "in_scope", records, why };
 }
