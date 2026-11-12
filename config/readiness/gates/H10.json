@@ -12,7 +12,12 @@
       "src/lib/demo/closeout.leftovers.test.ts",
       "src/lib/demo/closeout.server.test.ts",
       "src/lib/demo/closeout.command.test.ts",
-      "src/lib/demo/closeout.docs.test.ts"
-    ]
+      "src/lib/demo/closeout.docs.test.ts",
+      "src/lib/demo/closeout.shared-content.test.ts",
+      "src/lib/demo/closeout.audit-targets.test.ts",
+      "src/lib/demo/instructor-policy.test.ts",
+      "src/lib/demo/closeout.db.test.ts"
+    ],
+    "needs": "ci"
   }
 }

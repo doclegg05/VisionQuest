@@ -11,10 +11,11 @@ export type Ids = readonly string[];
 export type DemoEnv = Readonly<Record<string, string | undefined>>;
 export type Row = Readonly<Record<string, unknown>>;
 
-/** The four calls this tool makes on a table. */
+/** The five calls this tool makes on a table. updateMany only replaces a demo actor (closeout.shared-content.ts). */
 export interface CloseoutTable {
   count(args: { where?: Where }): Promise<number>;
   deleteMany(args: { where: Where }): Promise<{ count: number }>;
+  updateMany(args: { where: Where; data: Row }): Promise<{ count: number }>;
   findMany(args: { where: Where; select: Readonly<Record<string, true>> }): Promise<ReadonlyArray<Row>>;
   create(args: { data: Row }): Promise<unknown>;
 }
@@ -34,7 +35,7 @@ export interface CloseoutClient {
 
 function isCloseoutTable(value: unknown): value is CloseoutTable {
   if (typeof value !== "object" || value === null) return false;
-  return ["count", "deleteMany", "findMany", "create"].every((name) => typeof Reflect.get(value, name) === "function");
+  return ["count", "deleteMany", "updateMany", "findMany", "create"].every((name) => typeof Reflect.get(value, name) === "function");
 }
 
 /** The table for a model name, as Prisma exposes it on a client or a transaction. */

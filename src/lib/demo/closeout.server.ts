@@ -154,11 +154,16 @@ function countIn(result: unknown): number {
  *   - `admin-key`: a staff promotion made with the shared ADMIN_KEY
  *     (ADMIN_KEY_ACTOR, src/lib/promote-staff-account.ts).
  *   - `deterministic`: a wager verdict a rule resolved (src/lib/sage/wagers.ts).
- * And every value that starts with SENTINEL_PREFIX: `system` itself, the actor
- * of jobs, and `system:sage-autopilot` (src/lib/sage/briefing.ts).
+ *   - `system`: the actor of jobs.
+ *   - `demo-closed`: written by the closeout itself in place of a deleted demo
+ *     account, on audit rows about shared content (CLOSED_DEMO_ACTOR in
+ *     closeout.shared-content.ts, which a test pins to this list).
+ * And every value that starts with SENTINEL_PREFIX, such as
+ * `system:sage-autopilot` (src/lib/sage/briefing.ts). The colon is part of the
+ * prefix, so an id that merely starts with the letters "system" still counts.
  */
-export const SENTINEL_ACTORS: readonly string[] = ["admin-key", "deterministic"];
-export const SENTINEL_PREFIX = "system";
+export const SENTINEL_ACTORS: readonly string[] = ["admin-key", "deterministic", "system", "demo-closed"];
+export const SENTINEL_PREFIX = "system:";
 
 /**
  * Rows of one probe whose id names no row of its parent, sentinel actors left

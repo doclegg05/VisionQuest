@@ -7,6 +7,8 @@
  * from an error, because an error can quote all of those.
  */
 
+import { CLOSED_DEMO_ACTOR } from "./closeout.shared-content";
+
 export const REFUSALS = {
   demo_mode_on: "COHORT_DEMO_MODE is on in this terminal. Turn demo mode off in Render, let the deploy finish, and use a new terminal. Nothing was deleted.",
   cannot_see_every_row: "This database connection is limited by row level security, so it cannot see every row. Use the value of ADMIN_DATABASE_URL. Nothing was deleted.",
@@ -67,6 +69,8 @@ export function failureSentence(error: unknown, apply: boolean): string {
 const HOST_SHAPE = /^[A-Za-z0-9.:[\]-]+$/;
 /** A Supabase pooler user: `postgres.` and the 20 character project ref, which is not a secret. */
 const SUPABASE_USER = /^postgres\.([a-z0-9]{20})$/;
+/** A Supabase direct connection host, as .env.example writes ADMIN_DATABASE_URL: `db.<ref>.supabase.co`. */
+const SUPABASE_DIRECT_HOST = /^db\.([a-z0-9]{20})\.supabase\.co$/;
 
 /** What the connection string says about where it goes. Never the password or anything else from the user part. */
 interface NamedTarget {
@@ -93,14 +97,29 @@ function splitConnectionString(connectionString: string): { readonly user: strin
   return { user: userInfo.split(":")[0], host: hostAndRest.slice(0, end), rest: hostAndRest.slice(end) };
 }
 
-/** The same host as the standard parser reads, when it can read the string at all. A disagreement means do not trust either. */
+/**
+ * The same host as the standard parser reads, when it can read the string at
+ * all. A disagreement means do not trust either.
+ */
 function standardHostAgrees(connectionString: string, host: string): boolean {
   try {
     return new URL(connectionString).hostname === host;
   } catch {
-    // Not readable by the standard parser, as with a password that is not percent encoded. The hand reading stands.
-    return true;
+    // Not readable by the standard parser, as with a password that is not
+    // percent encoded. The hand reading stands only when the string has one
+    // `@`. With two, a password could end at either, and the second could be
+    // in the query, so the host is a guess.
+    const afterScheme = connectionString.slice(connectionString.indexOf("://") + 3);
+    return afterScheme.indexOf("@") === afterScheme.lastIndexOf("@");
   }
+}
+
+/** The project ref from a pooler user or a direct host. Null when neither has one, or when the two name different projects. */
+function projectRefOf(user: string, host: string): string | null {
+  const fromUser = SUPABASE_USER.exec(user)?.[1] ?? null;
+  const fromHost = SUPABASE_DIRECT_HOST.exec(host)?.[1] ?? null;
+  if (fromUser !== null && fromHost !== null && fromUser !== fromHost) return null;
+  return fromUser ?? fromHost;
 }
 
 /**
@@ -113,13 +132,14 @@ export function namedTarget(connectionString: string): NamedTarget {
   const parts = splitConnectionString(connectionString);
   if (!parts || !HOST_SHAPE.test(parts.host) || /[?&]host=/.test(parts.rest)) return NOTHING;
   if (!standardHostAgrees(connectionString, parts.host)) return NOTHING;
-  return { host: parts.host, projectRef: SUPABASE_USER.exec(parts.user)?.[1] ?? null };
+  return { host: parts.host, projectRef: projectRefOf(parts.user, parts.host) };
 }
 
 /**
  * The first lines of every run: which database this is. The database name and
  * the server's own address come from the server. The connection string adds
- * its host and, for a Supabase pooler user, the project ref. These two are what
+ * its host and the project ref, read from a Supabase pooler user
+ * (`postgres.<ref>`) or a direct connection host (`db.<ref>.supabase.co`). These two are what
  * the owner compares with the Supabase dashboard. Never the password, port,
  * path or options.
  */
@@ -153,6 +173,7 @@ export interface ReportCounts {
     readonly staffNotificationsAboutDemoStudents: number;
     readonly opportunitiesFromDemoLeads: number;
     readonly storageFoldersOfDemoAccounts: number;
+    readonly auditRowsKeptAboutSharedContent: number;
   };
 }
 
@@ -171,6 +192,7 @@ function leftoverLines(counts: ReportCounts): string[] {
   const files = counts.uploadedFilesLeftInStorage;
   const folders = counts.leftBehind.storageFoldersOfDemoAccounts;
   const listings = counts.leftBehind.opportunitiesFromDemoLeads;
+  const kept = counts.leftBehind.auditRowsKeptAboutSharedContent;
   const lines = orphaned === 0
     ? ["0 rows name an account or class that does not exist."]
     : [`${many(orphaned, "row names", "rows name")} an account or class that does not exist. Some are expected, such as Sage records kept on purpose for students who left. Write down each number below. The apply counts them again after its deletes and refuses if any column is higher. The tool does not change these rows.`,
@@ -178,6 +200,9 @@ function leftoverLines(counts: ReportCounts): string[] {
   if (settings > 0) lines.push(`${many(settings, "program setting holds", "program settings hold")} the id of the demo class. Remove the class from ${settings === 1 ? "it" : "them"} in Program Setup, or ask a developer.`);
   if (notices > 0) lines.push(`${many(notices, "notice to a staff member names", "notices to staff members name")} a demo account. ${notices === 1 ? "It stays in that staff member's list of notices." : "They stay in those staff members' lists of notices."}`);
   if (listings > 0) lines.push(`${many(listings, "opportunity listing was", "opportunity listings were")} copied from a demo class job lead. ${listings === 1 ? "It stays." : "They stay."}`);
+  if (kept > 0) {
+    lines.push(`${many(kept, "audit row records", "audit rows record")} a demo account acting on shared content, such as signing up for a real event. ${kept === 1 ? "It stays" : "They stay"}. The demo account's id on ${kept === 1 ? "it" : "them"} becomes ${CLOSED_DEMO_ACTOR}.`);
+  }
   if (files > 0) {
     const what = files === 1 ? "It may hold a real visitor's document." : "They may hold real visitors' documents.";
     lines.push(`${many(files, "uploaded file", "uploaded files")} in ${many(folders, "storage folder", "storage folders")} ${files === 1 ? "belongs" : "belong"} to the demo accounts. ${what} This tool does not remove files from storage, and removing them is a separate step that is not built yet.`);

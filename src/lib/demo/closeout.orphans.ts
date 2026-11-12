@@ -15,6 +15,7 @@
  */
 import { idsOf, tableOf, valuesWhere, type Run } from "./closeout.core";
 import { countOrphans, noticesNaming, type OrphanProbe } from "./closeout.server";
+import { sharedContentAuditIds } from "./closeout.shared-content";
 
 export type { OrphanProbe } from "./closeout.server";
 
@@ -82,6 +83,8 @@ export interface LeftBehind {
   readonly opportunitiesFromDemoLeads: number;
   /** Storage folders that hold the planned accounts' uploads. The tool removes none of them. */
   readonly storageFoldersOfDemoAccounts: number;
+  /** Audit rows a demo account wrote about shared content. They stay, with the actor replaced (closeout.shared-content.ts). */
+  readonly auditRowsKeptAboutSharedContent: number;
 }
 
 async function settingsNamingClasses(run: Run): Promise<number> {
@@ -111,5 +114,6 @@ export async function leftBehind(run: Run): Promise<LeftBehind> {
     staffNotificationsAboutDemoStudents: await noticesNaming(run.tx, run.plan.accountIds, run.chunk),
     opportunitiesFromDemoLeads: await mirroredOpportunities(run),
     storageFoldersOfDemoAccounts: await storageFolders(run),
+    auditRowsKeptAboutSharedContent: (await sharedContentAuditIds(run)).size,
   };
 }

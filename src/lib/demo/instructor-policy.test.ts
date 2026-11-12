@@ -282,6 +282,11 @@ describe("isDemoInstructorRequestAllowed", () => {
     }
   });
 
+  it("refuses the bulk export of a form template's answers", () => {
+    assert.equal(isDemoInstructorRequestAllowed("GET", "/api/teacher/forms/abc/export"), false);
+    assert.equal(isDemoInstructorRequestAllowed("HEAD", "/api/teacher/forms/abc/export"), false);
+  });
+
   it("refuses a route added under the export and audit reads", () => {
     for (const pathname of ["/api/teacher/export/csv", "/api/teacher/export/abc/file", "/api/teacher/audit/abc"]) {
       assert.equal(isDemoInstructorRequestAllowed("GET", pathname), false, pathname);

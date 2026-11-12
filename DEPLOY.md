@@ -418,6 +418,13 @@ What the tool does not remove:
 * **Uploaded files in storage.** The tool deletes the database row for each demo upload. The file itself stays in the bucket named by `STORAGE_BUCKET`, and those files may hold real visitors' documents, because anyone could use the demo. The preview gives the number of files as `uploadedFilesLeftInStorage` and the number of folders as `leftBehind.storageFoldersOfDemoAccounts`. The tool does not remove them. Removing them is a separate step that is not built yet.
 * **Text that mentions the demo.** The preview counts program settings that hold the demo class id (`leftBehind.systemConfigNamingDemoClass`), notices to staff that name a demo account (`leftBehind.staffNotificationsAboutDemoStudents`) and opportunity listings copied from a demo class job lead (`leftBehind.opportunitiesFromDemoLeads`). It changes none of them.
 * **Shared program content** that a demo account only pointed at: employers, events, form templates, program documents, regions, and job listings of other classes. Rate limit rows stay too.
+* **Audit log entries about that shared content.** When a demo student signed up for a real event, updated an application on a real opportunity or saved a real job listing, the audit log entry stays, so the record of it is kept. The tool replaces the demo account's id on it with `demo-closed`. The preview counts these as `leftBehind.auditRowsKeptAboutSharedContent`. Any other entry about kept content, such as the demo instructor changing a real event, still makes the apply refuse.
+
+**Developer check, before the owner's first run.** The apply refuses with `schema_mismatch` when the database lists a migration this checkout does not have, such as one applied from an old branch whose folder never reached `main`. A developer runs this query on production, read only, and compares the names with the folders in `prisma/migrations`:
+```sql
+SELECT migration_name FROM visionquest."_prisma_migrations" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL ORDER BY migration_name;
+```
+Success looks like every name having a folder of the same name in `prisma/migrations` on `main`, and every folder having a name in the list. A name with no folder makes the apply refuse every time. Do not delete the row by hand: tell the owner, and decide with them before step 1.
 
 1. **Bring the main checkout up to date.** Use the main checkout of this repository, not a copy made for one task. In a terminal opened in that folder, run:
    ```sh
@@ -441,8 +448,11 @@ What the tool does not remove:
    ```
    The preview reads and changes nothing. Read it top to bottom:
    * The first three lines say which database this is. Check two of them against the Supabase dashboard of the production project. If either does not match, stop.
-     * The line `Project ref:` must show the same letters as the Project ID in the Supabase dashboard, Project Settings, General. If it says `not in the connection string`, the value you loaded is not a Supabase pooler connection string: stop and ask a developer.
-     * The line `Target: database ... on host ...` must show the same host as the connection string in the Supabase dashboard. Click **Connect** at the top of the project page, choose the session pooler, and read the host: the part after the `@` and before the next `:`. The database name is `postgres` on every Supabase project, so it tells you nothing.
+     * The line `Project ref:` must show the same letters as the Project ID in the Supabase dashboard, Project Settings, General. The tool reads it from a session pooler user (`postgres.<ref>`) or from a direct connection host (`db.<ref>.supabase.co`). If it says `not in the connection string`, the value you loaded is neither: stop and ask a developer.
+     * The line `Target: database ... on host ...` must show the same host as the connection string in the Supabase dashboard. Click **Connect** at the top of the project page and read the host: the part after the `@` and before the next `:`.
+       * If the host ends in `pooler.supabase.com`, choose the session pooler there and compare with its host.
+       * If the host starts with `db.` and ends in `.supabase.co`, choose **Direct connection** there and compare with its host, `db.<ref>.supabase.co`. The letters between `db.` and `.supabase.co` are the same Project ID as above.
+       * The database name is `postgres` on every Supabase project, so it tells you nothing.
      * The line `Server address:` is a private address that the dashboard does not show. Do not compare it.
    * `marked` is the accounts and classes the apply would delete, and `rowsToDelete` is the rows that would go, table by table.
    * `unmarked` is the accounts the tool leaves. Read the sentences under the counts. A number above 0 means mock accounts may still be in the database.
