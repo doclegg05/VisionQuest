@@ -74,6 +74,9 @@ interface SendErrorResult extends TurnResult {
 function crisisBlockFor(input: SendErrorInput): string | null {
   if (input.crisisBlock) return input.crisisBlock;
   if (input.firstEventSeen || input.err instanceof SageSendError) return null;
+  // Staff chats get no 988 block from the server (route.ts runs no crisis check
+  // for them), so the chat's own check stays student-only too.
+  if (input.role !== "student") return null;
   return localCrisisBlock(input.text);
 }
 

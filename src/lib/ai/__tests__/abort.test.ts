@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { getEventListeners } from "node:events";
-import { describe, it } from "node:test";
+import { describe, it, mock } from "node:test";
 
 import { abortable, linkedController } from "../abort";
+import { logger } from "@/lib/logger";
 
 // E9b 7: one turn's signal is shared by every provider fetch on that turn.
 // Linking must not leave a listener on it per call, or a long tool turn
@@ -64,5 +65,19 @@ describe("abortable (E9b 5)", () => {
     const turn = new AbortController();
     turn.abort();
     await assert.rejects(abortable(Promise.resolve("late"), turn.signal), { name: "AbortError" });
+  });
+
+  it("logs, rather than drops, work that fails after its turn already stopped", async () => {
+    const info = mock.method(logger, "info", () => undefined);
+    try {
+      const turn = new AbortController();
+      turn.abort();
+      await assert.rejects(abortable(Promise.reject(new Error("late failure")), turn.signal), { name: "AbortError" });
+      await new Promise((r) => setImmediate(r));
+      assert.equal(info.mock.callCount(), 1);
+      assert.match(String(info.mock.calls[0].arguments[0]), /after its turn was stopped/);
+    } finally {
+      info.mock.restore();
+    }
   });
 });

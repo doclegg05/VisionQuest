@@ -1,3 +1,6 @@
+import { errorForLog } from "@/lib/log-error";
+import { logger } from "@/lib/logger";
+
 /**
  * Cancellation for model calls (E7). The chat route hands the providers an
  * AbortSignal that fires on a Stop or a dropped connection, so the model host
@@ -36,7 +39,9 @@ function abortError(): Error {
  */
 export function abortable<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
   if (signal.aborted) {
-    void work.catch(() => undefined);
+    // The turn already ended, so nothing awaits `work`; log a late failure
+    // instead of dropping it, by name and code only (no student data).
+    void work.catch((error: unknown) => logger.info("Work ended after its turn was stopped", { error: errorForLog(error) }));
     return Promise.reject(abortError());
   }
   return new Promise<T>((resolve, reject) => {

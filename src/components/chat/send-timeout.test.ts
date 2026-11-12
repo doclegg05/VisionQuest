@@ -23,7 +23,7 @@ function abortError(): Error {
 }
 
 /** A send the gate timed out before the first event. */
-function timedOutSend(text: string) {
+function timedOutSend(text: string, role: "student" | "teacher" | "admin" | "coordinator" = "student") {
   return messagesAfterSendError({
     err: abortError(),
     stopped: false,
@@ -33,7 +33,7 @@ function timedOutSend(text: string) {
     partial: "",
     events: [],
     crisisBlock: null,
-    role: "student",
+    role,
     savedUserMessageId: null,
     id: "err-1",
   });
@@ -55,6 +55,13 @@ describe("a crisis message the chat cut off itself still shows the 988 help (E9b
 
   it("the help follows the language of the matched pattern", () => {
     assert.equal(timedOutSend(CRISIS_TEXT_ES).messages.at(-1)?.content, HELP_ES);
+  });
+
+  it("staff never get the 988 bubble, matching the server, which runs no crisis check for staff", () => {
+    for (const role of ["teacher", "admin", "coordinator"] as const) {
+      const after = timedOutSend(CRISIS_TEXT, role);
+      assert.equal(after.messages.length, 1, role);
+    }
   });
 
   it("a plain message gets no 988 bubble", () => {
