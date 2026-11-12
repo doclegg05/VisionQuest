@@ -2,6 +2,8 @@ import { createHmac } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { hashPassword, invalidateSessionCache, normalizeEmail, normalizeStudentId, setSessionCookie } from "@/lib/auth";
 import { prismaAdmin as prisma } from "@/lib/db";
+import { afterWrite } from "@/lib/after-write";
+import { deferAfterResponse } from "@/lib/after-response";
 import { clientIpBucket } from "@/lib/client-ip";
 import { rateLimit, refundRateLimit } from "@/lib/rate-limit";
 import {
@@ -29,9 +31,9 @@ const RECOVERY_UNAVAILABLE_ERROR =
  * FAILED attempts one network address may make per hour. 20 is room for a
  * classroom's mistyped answers and no more: a recovery that worked gives its
  * unit back, and this route sets a password from three short answers. This
- * bucket slows one address guessing across many accounts. It is a courtesy
- * limit: the address comes from `X-Forwarded-For`, which a caller can set
- * (src/lib/client-ip.ts). The per-account limit below is the real control.
+ * bucket slows one address guessing across many accounts. The address is the
+ * hop the platform's proxy appended to `X-Forwarded-For` (src/lib/client-ip.ts,
+ * readiness A6). The per-account limit below is the real control.
  * An attempt holds its unit until it is answered, so failed attempts plus
  * attempts in flight can never pass 20.
  */
@@ -166,6 +168,23 @@ async function recordLockout(studentId: string, ip: string, resetTime: number): 
 }
 
 /**
+ * The lockout row is written after the response (readiness A6). Awaited
+ * here, a failed audit write turned a real account's last attempt into a 500
+ * while an unknown login still read the generic refusal, so the status named
+ * the account. A failed write is logged with the account's one-way key.
+ */
+function deferLockoutRecord(studentId: string, ip: string, resetTime: number): void {
+  deferAfterResponse(() =>
+    afterWrite(() => recordLockout(studentId, ip, resetTime), {
+      surface: "auth/reset-password/questions",
+      effect: "recordLockout",
+      studentId,
+      level: "error",
+    }),
+  );
+}
+
+/**
  * Per-account limit, keyed on the target account. The login is not a secret,
  * so answers get guessed from anywhere; counting here, before the answers are
  * checked, means every guess spends the budget.
@@ -201,7 +220,7 @@ async function countAccountAttempt(
   );
   if (accountRl.degraded) return "unavailable";
   if (!accountRl.success) return "locked";
-  if (student && accountRl.remaining === 0) await recordLockout(student.id, ip, accountRl.resetTime);
+  if (student && accountRl.remaining === 0) deferLockoutRecord(student.id, ip, accountRl.resetTime);
   return "open";
 }
 

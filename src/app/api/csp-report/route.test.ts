@@ -49,7 +49,7 @@ function post(body: unknown) {
   const req = mockRequest("/api/csp-report", {
     method: "POST",
     body,
-    headers: { "x-forwarded-for": `${CLIENT_IP}, 10.0.0.1` },
+    headers: { "x-forwarded-for": `10.0.0.1, ${CLIENT_IP}` },
   });
   return route.POST(req as never);
 }

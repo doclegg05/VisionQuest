@@ -294,6 +294,30 @@ describe("POST /api/auth/reset-password/questions", () => {
     assert.doesNotMatch(JSON.stringify(mockLoggerWarn.mock.calls[0]!.arguments), /stu-1/);
   });
 
+  it("answers a real account exactly like an unknown login even when the lockout audit write fails", async () => {
+    // Readiness A6: the lockout row was awaited before the response, so a
+    // failed write turned a real account's last attempt into a 500 while an
+    // unknown login still read the generic 400, which named the account.
+    mockRateLimit.mock.mockImplementation(async (key: string) =>
+      key === `reset-password-questions:user:${STUDENT.id}`
+        ? { success: true, remaining: 0, resetTime: Date.now() + 60_000, degraded: false }
+        : { ...okLimit(), remaining: key.includes(":unknown:") ? 0 : 4 },
+    );
+    mockVerifySecurityAnswer.mock.mockImplementation(() => false);
+    mockLogAuditEvent.mock.mockImplementation(async () => {
+      throw new Error("audit store unavailable");
+    });
+
+    const real = await questionsRoute.POST(resetRequest() as never);
+    mockFindFirst.mock.mockImplementation(async () => null);
+    const unknown = await questionsRoute.POST(resetRequest() as never);
+
+    assert.equal(real.status, 400);
+    assert.equal(real.status, unknown.status);
+    assert.deepEqual(await real.json(), await unknown.json());
+    assert.deepEqual(auditActions(), ["auth.password.reset.security_questions_locked_out"], "the write was still tried");
+  });
+
   it("counts a wrong-answer attempt against the account and returns the generic error", async () => {
     mockVerifySecurityAnswer.mock.mockImplementation(() => false);
 

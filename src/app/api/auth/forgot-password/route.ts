@@ -18,9 +18,8 @@ import { getJwtSecret } from "@/lib/session-token";
 /**
  * Reset requests one network address may make per window. Every caller gets
  * the same answer, so there is no successful request to give a unit back
- * for; 30 lets each student in a classroom of 30 ask once. A courtesy limit:
- * the address comes from `X-Forwarded-For`, which a caller can set
- * (src/lib/client-ip.ts).
+ * for; 30 lets each student in a classroom of 30 ask once. The address is the
+ * hop the platform's proxy appended to `X-Forwarded-For` (src/lib/client-ip.ts).
  */
 const NETWORK_REQUEST_LIMIT = 30;
 const NETWORK_LIMIT_WINDOW_MS = 15 * 60 * 1000;
