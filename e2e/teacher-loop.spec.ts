@@ -89,9 +89,11 @@ test("teacher works the loop: queue → student detail → anchors → verificat
 
     // 4. The verification surface is reachable and live: the seeded pending
     // orientation claim shows the verify affordances.
-    await expect(page.getByText(/student marked done/i)).toBeVisible();
-    await expect(page.getByRole("button", { name: "Confirm" }).first()).toBeVisible();
-    await expect(page.getByRole("button", { name: "Decline" }).first()).toBeVisible();
+    // Copy from the C1 review: "Student says done", Confirm and Send back, each
+    // button named for its step.
+    await expect(page.getByText(/student says done/i).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: /^confirm orientation step:/i }).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: /^send back orientation step:/i }).first()).toBeVisible();
 
     // A second anchor on a different tab (admin), same navigation path
     // teachers hit from queue action links.

@@ -34,12 +34,10 @@ test.describe("Cohort demo mode off", () => {
     await expect(page.getByRole("button", { name: DEMO_ENTER_INSTRUCTOR })).toHaveCount(0);
     await expect(page.getByText(DEMO_SIGNIN_NOTE)).toHaveCount(0);
 
-    // The block the demo buttons replace is back: the Google button where
-    // Google sign-in is configured, or its note where it is not (CI has no
-    // Google credentials, so the note is what shows there).
-    await expect(
-      page.getByRole("link", { name: /sign in with google/i }).or(page.getByText(/google sign-in is not enabled/i)),
-    ).toBeVisible();
+    // Where Google sign-in is not configured (CI has no Google credentials),
+    // nothing takes the demo block's place: D3 removed the "not enabled" note
+    // students used to see.
+    await expect(page.getByText(/google sign-in is not enabled/i)).toHaveCount(0);
   });
 
   for (const endpoint of ["/api/demo/student", "/api/demo/instructor"]) {
