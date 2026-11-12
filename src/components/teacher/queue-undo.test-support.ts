@@ -3,6 +3,7 @@
  * helpers that hold a request open so a test can act while it is out.
  */
 import {
+  ALREADY_SAVED,
   AlertChangedError,
   alertLineState,
   createQueueUndo,
@@ -10,6 +11,7 @@ import {
   type QueueUndo,
   type QueueUndoDeps,
   type QueueUndoTarget,
+  type SaveReceipt,
   type UndoExpectation,
 } from "./queue-undo";
 
@@ -51,6 +53,10 @@ export interface HarnessOptions {
   conflictOn?: QueueSendRequest;
   /** Saves answer with nothing an Undo could expect. */
   noReceipt?: boolean;
+  /** Any request for this alert is answered 409. */
+  conflictOnAlert?: string;
+  /** Saves for this alert answer with a decision already stored, maybe another instructor's. */
+  alreadySavedOn?: string;
 }
 
 export function harness(options: HarnessOptions = {}): Harness {
@@ -64,7 +70,8 @@ export function harness(options: HarnessOptions = {}): Harness {
       sent.push([alertId, request]);
       if (expected) expectations.push(expected);
       if (options.failOn === request || failNext.delete(request)) throw new Error("network down");
-      if (options.conflictOn === request) throw new AlertChangedError();
+      if (options.conflictOn === request || options.conflictOnAlert === alertId) throw new AlertChangedError();
+      if (options.alreadySavedOn === alertId && request !== "reopen") return ALREADY_SAVED;
       return options.noReceipt ? null : receiptFor(request);
     },
     confirm: async (question) => {
@@ -125,7 +132,7 @@ export function holding(h: Harness, request: QueueSendRequest): Held {
     if (sent !== request) return h.deps.send(alertId, sent, expected);
     h.sent.push([alertId, sent]);
     if (expected) h.expectations.push(expected);
-    return new Promise<UndoExpectation | null>((resolve, reject) => {
+    return new Promise<SaveReceipt>((resolve, reject) => {
       release = () => resolve(receiptFor(sent));
       fail = () => reject(new Error("network down"));
     });

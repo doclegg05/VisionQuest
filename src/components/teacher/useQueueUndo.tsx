@@ -15,8 +15,9 @@ import {
   type QueueUndoMessage,
   type QueueUndoQuestion,
   type QueueUndoTarget,
+  type SaveReceipt,
+  saveReceiptFrom,
   type UndoExpectation,
-  undoExpectationFrom,
 } from "./queue-undo";
 
 interface QueueUndoOptions<Rows> {
@@ -55,18 +56,18 @@ function alertRequestBody(action: QueueSendRequest, expected: UndoExpectation | 
   return { action };
 }
 
-/** One alert request. A 409 means another instructor changed the alert; the flow says so and reloads. */
+/** One alert request. A 409 means the alert changed since the queue loaded; the flow says so. */
 async function sendAlertRequest(
   alertId: string,
   action: QueueSendRequest,
   expected?: UndoExpectation,
-): Promise<UndoExpectation | null> {
+): Promise<SaveReceipt> {
   try {
     const answer = await api.patch<unknown>(
       `/api/teacher/alerts/${encodeURIComponent(alertId)}`,
       alertRequestBody(action, expected),
     );
-    return action === "reopen" ? null : undoExpectationFrom(action, answer);
+    return action === "reopen" ? null : saveReceiptFrom(action, answer);
   } catch (error: unknown) {
     if (error instanceof ApiClientError && error.status === 409) throw new AlertChangedError();
     throw error;

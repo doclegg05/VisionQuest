@@ -16,7 +16,9 @@
  *
  * Undo sends back the status and timestamp its save wrote (`UndoExpectation`), so the route reopens the alert only if
  * nobody has changed it since. If somebody has, the route answers 409, `send` throws `AlertChangedError`, and the flow
- * says so and reloads the queue. Resolved, Dismiss and Snooze get the same answer when the alert is no longer open.
+ * says so and reloads the queue. Resolved, Dismiss and Snooze get the same answer when the alert is no longer open. A
+ * save the route reports as already stored (`ALREADY_SAVED`) shows as done with no Undo: its stamp may be another
+ * instructor's.
  *
  * A critical alert asks first for all three. Declining leaves any earlier Undo offer as it was.
  *
@@ -47,7 +49,32 @@ export class AlertChangedError extends Error {
   }
 }
 
-export const ALERT_CHANGED_TEXT = "Someone else changed this alert. The list now shows the latest.";
+/** True whether an instructor or the alert sync changed it. */
+export const ALERT_CHANGED_TEXT = "This alert changed. The list now shows the latest.";
+/** The same, while an Undo is offered for another alert: a reload would take that Undo's line away. */
+export const ALERT_CHANGED_REFRESH_TEXT = "This alert changed. Refresh the list to see the latest.";
+
+/**
+ * The route's answer when the alert already held the requested status and nothing was written. Its stamp may be
+ * another instructor's, so no Undo is offered for it.
+ */
+export const ALREADY_SAVED = "already-saved";
+
+/** What a save's answer lets the flow do: offer an Undo with this expectation, show it as already handled, or neither. */
+export type SaveReceipt = UndoExpectation | typeof ALREADY_SAVED | null;
+
+const ALREADY_SAVED_TEXT: Record<UndoableAlertAction, string> = {
+  resolve: "This alert was already resolved.",
+  dismiss: "This alert was already dismissed.",
+};
+
+/** Reads the route's answer to a Resolved, Dismiss or Snooze. */
+export function saveReceiptFrom(action: QueueAlertRequest, body: unknown): SaveReceipt {
+  if (typeof body === "object" && body !== null && (body as Record<string, unknown>).alreadySaved === true) {
+    return ALREADY_SAVED;
+  }
+  return undoExpectationFrom(action, body);
+}
 
 /** The expected state in the route's answer to a Resolved or Dismiss, or null if it holds none. */
 export function undoExpectationFrom(action: QueueAlertRequest, body: unknown): UndoExpectation | null {
@@ -132,9 +159,10 @@ export interface QueueReloadHooks {
 export interface QueueUndoDeps {
   /**
    * Sends one request. For Resolved and Dismiss it returns what the save wrote; Undo passes that back as `expected`.
-   * Throws `AlertChangedError` on a 409, anything else on another failure.
+   * `ALREADY_SAVED` means the alert already held that status. Throws `AlertChangedError` on a 409, anything else on
+   * another failure.
    */
-  send: (alertId: string, request: QueueSendRequest, expected?: UndoExpectation) => Promise<UndoExpectation | null>;
+  send: (alertId: string, request: QueueSendRequest, expected?: UndoExpectation) => Promise<SaveReceipt>;
   confirm: (question: QueueUndoQuestion) => Promise<boolean>;
   /** Reloads the queue. The load reports back through `reload`, so nothing here reads what it returns. */
   refresh: (reload: QueueReloadHooks) => Promise<unknown>;
@@ -371,9 +399,9 @@ async function act(core: FlowCore, alert: QueueUndoTarget, action: QueueAlertReq
   const before = core.snapshot.state;
   const previous = before.kind === "confirming" ? before.previous : start.previous;
   update(core, { state: { kind: "sending", alertId: alert.id, action, previous }, message: null });
-  let expected: UndoExpectation | null;
+  let receipt: SaveReceipt;
   try {
-    expected = await core.deps.send(alert.id, action);
+    receipt = await core.deps.send(alert.id, action);
   } catch (error: unknown) {
     if (!mounted()) return;
     if (error instanceof AlertChangedError) await changedElsewhere(core);
@@ -381,17 +409,24 @@ async function act(core: FlowCore, alert: QueueUndoTarget, action: QueueAlertReq
     return;
   }
   if (!mounted()) return;
-  await saved(core, alert.id, action, expected);
+  await saved(core, alert.id, action, receipt);
 }
 
-/** The route refused because another instructor changed the alert. Only a reload shows what it is now. */
+/**
+ * The route refused because the alert changed: another instructor, or the alert sync, got there first. Only a reload
+ * shows what it is now. But a reload lists only open alerts, so it would take away the line holding an Undo offered
+ * for another alert. While one is offered it stays, as it does after `actionFailed`, and the message asks for a
+ * refresh; Refresh list is on screen, since that offer's done line is held.
+ */
 async function changedElsewhere(core: FlowCore): Promise<void> {
+  const { state } = core.snapshot;
+  const previous = state.kind === "sending" ? state.previous : null;
   update(core, {
-    state: IDLE,
-    message: note(core, "alert", ALERT_CHANGED_TEXT),
+    state: offerState(previous),
+    message: note(core, "alert", previous ? ALERT_CHANGED_REFRESH_TEXT : ALERT_CHANGED_TEXT),
     focus: focusOn(core, QUEUE_STATUS_ID),
   });
-  await reload(core);
+  if (!previous) await reload(core);
 }
 
 /** The send worked. The line turns into a done line, stamped so a reload that began earlier cannot clear it. */
@@ -399,7 +434,7 @@ async function saved(
   core: FlowCore,
   alertId: string,
   action: QueueAlertRequest,
-  expected: UndoExpectation | null,
+  receipt: SaveReceipt,
 ): Promise<void> {
   core.seq += 1;
   const seq = core.seq;
@@ -408,6 +443,12 @@ async function saved(
     await snoozed(core, done);
     return;
   }
+  // A snooze is handled above, so `action` is a Resolved or a Dismiss from here on.
+  if (receipt === ALREADY_SAVED) {
+    alreadySaved(core, action, done);
+    return;
+  }
+  const expected = receipt;
   if (!expected) {
     // Saved, but the answer holds nothing an Undo could check against, so no Undo is offered.
     update(core, { state: IDLE, done, focus: focusOn(core, QUEUE_STATUS_ID) });
@@ -417,6 +458,19 @@ async function saved(
     state: { kind: "undoable", alertId, action, seq, expected },
     done,
     focus: focusOn(core, alertControlId(alertId, "undo")),
+  });
+}
+
+/** The alert already held this status, maybe by another instructor. Its line shows as done, with no Undo. */
+function alreadySaved(core: FlowCore, action: UndoableAlertAction, done: QueueUndoSnapshot["done"]): void {
+  const { state } = core.snapshot;
+  // Nothing new was resolved or dismissed, so an Undo offered for another alert stays.
+  const previous = state.kind === "sending" ? state.previous : null;
+  update(core, {
+    state: offerState(previous),
+    done,
+    message: note(core, "status", ALREADY_SAVED_TEXT[action]),
+    focus: focusOn(core, QUEUE_STATUS_ID),
   });
 }
 

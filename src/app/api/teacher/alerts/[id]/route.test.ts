@@ -109,7 +109,7 @@ describe("PATCH /api/teacher/alerts/:id, Undo against a newer decision", () => {
 
     const undo = await patch(A, { action: "reopen", expected: { status: "resolved", at: resolved.json.resolvedAt } });
     assert.equal(undo.status, 409);
-    assert.equal(undo.json.error, "Someone else changed this alert. The list now shows the latest.");
+    assert.equal(undo.json.error, "This alert changed. The list now shows the latest.");
     assert.deepEqual(row, before);
   });
 
@@ -161,6 +161,16 @@ describe("PATCH /api/teacher/alerts/:id, resolve, dismiss and snooze act only on
     assert.equal(second.json.resolvedAt, first.json.resolvedAt);
     assert.deepEqual(row, before);
     assert.deepEqual(auditActions(), ["teacher.alert.resolved"]);
+  });
+
+  // The saved answer carries A's stamp. Without the flag, B's queue would offer an Undo that reopens A's decision.
+  it("marks the saved answer as already saved, and a fresh one not", async () => {
+    const first = await patch(A, { action: "dismiss" });
+    assert.equal(first.json.alreadySaved, undefined);
+    const second = await patch(B, { action: "dismiss" });
+    assert.equal(second.status, 200);
+    assert.equal(second.json.alreadySaved, true);
+    assert.equal(second.json.dismissedAt, first.json.dismissedAt);
   });
 
   it("keeps the scope check before any write", async () => {
