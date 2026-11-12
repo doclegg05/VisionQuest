@@ -182,7 +182,10 @@ describe("demo closeout procedure in DEPLOY.md", () => {
   });
 
   it("has a developer compare production's applied migrations with this checkout before the owner's first run", () => {
-    assert.match(steps, /SELECT migration_name FROM visionquest\."_prisma_migrations" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL/);
+    assert.match(steps, /SELECT DISTINCT migration_name FROM visionquest\."_prisma_migrations" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL/);
+    // Run where no connection string reaches a command line, and cover the ledger the tool falls back to.
+    assert.match(steps, /SQL editor/);
+    assert.match(steps, /public\."_prisma_migrations"/);
     assert.match(steps, /prisma\/migrations/);
     assert.match(steps, /`schema_mismatch`/);
     // Not a numbered step: the owner's steps refer to each other by number.

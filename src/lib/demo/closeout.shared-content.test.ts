@@ -40,7 +40,6 @@ describe("demo closeout: audit rows about shared content", () => {
   it("names each shared kind once, with the actions and the demo account kind that may write it", () => {
     const pairs = SHARED_CONTENT_RECORDS.flatMap((entry) => entry.actions.map((action) => `${entry.actor} ${action} ${entry.targetType}`));
     assert.deepEqual(pairs.sort(), [
-      "instructor teacher.form.export form_template",
       "student application.updated opportunity",
       "student event.registered event",
       "student event.unregistered event",
@@ -65,16 +64,6 @@ describe("demo closeout: audit rows about shared content", () => {
     });
   }
 
-  it("keeps the demo instructor's form export row about a real form template", async () => {
-    const s = await scene();
-    const row = auditRow(s.db, s.demo.staffId, "teacher.form.export", "form_template", "rl-FormTemplate");
-
-    const outcome = await apply(s.db);
-
-    assert.equal(outcome.kind, "applied", codes(outcome).join(", "));
-    assert.equal(s.db.rows("AuditLog").find((entry) => entry.id === row.id)?.actorId, CLOSED_DEMO_ACTOR);
-  });
-
   it("does not count the kept rows as orphans, before or after the apply", async () => {
     const s = await scene();
     auditRow(s.db, s.demo.studentId, "event.registered", "event", "rl-CareerEvent");
@@ -91,7 +80,7 @@ describe("demo closeout: audit rows about shared content", () => {
     const s = await scene();
     const plain = await preview(s.db);
     auditRow(s.db, s.demo.studentId, "event.registered", "event", "rl-CareerEvent");
-    auditRow(s.db, s.demo.staffId, "teacher.form.export", "form_template", "rl-FormTemplate");
+    auditRow(s.db, s.demo.studentId, "job.save", "JobBrowseListing", "rl-JobBrowseListing");
 
     const outcome = await preview(s.db);
 
@@ -114,6 +103,8 @@ describe("demo closeout: audit rows about shared content", () => {
   });
 
   const refused: ReadonlyArray<{ name: string; arrange: (s: Scene) => void }> = [
+    // A bulk export of real students' intake answers is a disclosure, not self-service: it must stop the closeout.
+    { name: "the demo instructor exported a real form template's responses", arrange: (s) => void auditRow(s.db, s.demo.staffId, "teacher.form.export", "form_template", "rl-FormTemplate") },
     { name: "the demo instructor edited a real career event", arrange: (s) => void auditRow(s.db, s.demo.staffId, "event.updated", "event", "rl-CareerEvent") },
     { name: "the demo instructor wrote a student action about a real event", arrange: (s) => void auditRow(s.db, s.demo.staffId, "event.registered", "event", "rl-CareerEvent") },
     { name: "a demo student wrote a form export row", arrange: (s) => void auditRow(s.db, s.demo.studentId, "teacher.form.export", "form_template", "rl-FormTemplate") },

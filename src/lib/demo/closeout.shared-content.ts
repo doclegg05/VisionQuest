@@ -38,11 +38,13 @@ export const SHARED_CONTENT_RECORDS: readonly SharedContentRecord[] = [
   { actor: "student", targetType: "opportunity", actions: ["application.updated"] },
   // A JobBrowseListing: src/app/api/jobs/save/route.ts. A class JobListing is not shared, so it is not here.
   { actor: "student", targetType: "JobBrowseListing", actions: ["job.save"] },
-  // A FormTemplate: src/app/api/teacher/forms/[templateId]/export/route.ts.
-  // The route admits admins only and READ_DENY refuses the demo instructor, so a
-  // row here would predate both. It is listed so such a row cannot block a closeout.
-  { actor: "instructor", targetType: "form_template", actions: ["teacher.form.export"] },
+  // Not listed on purpose: `teacher.form.export` (form_template). It is a bulk
+  // export of real students' intake answers, admins only, and READ_DENY refuses
+  // the demo instructor. A row for it means a demo account once had admin rights,
+  // which is a disclosure that must stop the closeout, so it refuses.
 ];
+// Kept rows keep their summary text. A `job.save` summary names the demo
+// account's seeded display name from bootstrap.ts, which visitors cannot change.
 
 /** How each kind of demo account is marked, as reset.ts and bootstrap.ts create it. */
 const MARK_OF: Readonly<Record<DemoKind, { readonly role: string; readonly demoAccount: string }>> = {
