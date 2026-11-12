@@ -51,7 +51,7 @@ export const POST = withTeacherAuth(async (session, req: NextRequest) => {
       action: "mfa.backup_codes_regeneration_failed",
       targetType: "student",
       targetId: student.id,
-      summary: `Backup code regeneration failed for ${student.studentId} — invalid token.`,
+      summary: `Backup code regeneration failed: invalid token.`,
     });
 
     return NextResponse.json({ error: "Invalid MFA code." }, { status: 401 });
@@ -83,7 +83,7 @@ export const POST = withTeacherAuth(async (session, req: NextRequest) => {
     action: "mfa.backup_codes_regenerated",
     targetType: "student",
     targetId: student.id,
-    summary: `Backup codes regenerated for ${student.studentId}.`,
+    summary: `Backup codes regenerated.`,
   });
 
   return NextResponse.json({

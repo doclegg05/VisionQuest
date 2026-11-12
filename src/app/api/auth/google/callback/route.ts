@@ -155,7 +155,7 @@ async function refuseAccountMismatch(req: NextRequest, student: GoogleAccount) {
     action: "auth.google_login_refused_account_mismatch",
     targetType: "student",
     targetId: student.id,
-    summary: `Google sign-in refused for ${student.studentId}: the email is bound to a different Google account.`,
+    summary: `Google sign-in refused: the email is bound to a different Google account.`,
   });
   return NextResponse.redirect(new URL("/?error=oauth_account_mismatch", req.url));
 }
@@ -287,7 +287,7 @@ export async function GET(req: NextRequest) {
         action: "auth.google_login_mfa_required",
         targetType: "student",
         targetId: student.id,
-        summary: `Google sign-in verified for ${student.studentId} — MFA challenge required.`,
+        summary: `Google sign-in verified; MFA challenge required.`,
       });
       return redirectTo("/?mfa=1");
     }
@@ -307,7 +307,7 @@ export async function GET(req: NextRequest) {
         action: "auth.google_link",
         targetType: "student",
         targetId: student.id,
-        summary: `Google account linked to ${student.studentId} by verified email.`,
+        summary: `Google account linked by verified email.`,
       });
     }
 
@@ -323,7 +323,7 @@ export async function GET(req: NextRequest) {
       action: "auth.google_login",
       targetType: "student",
       targetId: student.id,
-      summary: `Google OAuth login for ${student.studentId}.`,
+      summary: `Google OAuth login.`,
     });
 
     return redirectTo("/chat");

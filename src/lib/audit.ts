@@ -78,8 +78,10 @@ export type StudentViewSurface =
   | "spokes"
   /** Pathway suggestions for one of the student's goals. */
   | "pathway"
-  /** One failed extraction's stored conversation snapshot. */
+  /** One failed extraction's row: its error text, without the chat. */
   | "failed_extraction"
+  /** The same row's stored conversation snapshot (`?include=payload`). */
+  | "failed_extraction_payload"
   /** A file or signed form the student uploaded, downloaded by staff. */
   | "files"
   /** What Sage has noted about the student (`/api/sage/insights`). */
@@ -93,11 +95,15 @@ export type StudentViewSurface =
 
 /**
  * Surfaces written on every read instead of once a day. The archive download
- * hands over the whole record in one file, so each download is its own event:
- * a second copy taken the same afternoon must leave its own row. These skip
- * the same-day lookup below.
+ * hands over the whole record in one file, and a failed extraction's payload
+ * is the student's own chat text, so each is its own event: a second copy
+ * taken the same afternoon must leave its own row. These skip the same-day
+ * lookup below.
  */
-const UNSAMPLED_SURFACES: ReadonlySet<StudentViewSurface> = new Set(["archive"]);
+const UNSAMPLED_SURFACES: ReadonlySet<StudentViewSurface> = new Set([
+  "archive",
+  "failed_extraction_payload",
+]);
 
 interface StudentViewInput {
   actorId: string;

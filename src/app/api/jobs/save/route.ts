@@ -51,7 +51,7 @@ export const POST = withAuth(async (session: Session, req: Request) => {
     actorId: session.id,
     targetType: listing.kind === "class" ? "JobListing" : "JobBrowseListing",
     targetId: listing.id,
-    summary: `${session.displayName} ${saveStatus} job "${listing.title}"`,
+    summary: `Student ${saveStatus} job "${listing.title}"`,
   });
 
   return NextResponse.json({ savedJob });

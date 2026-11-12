@@ -35,8 +35,6 @@ export const PATCH = withTeacherAuth(async (
       student: {
         select: {
           id: true,
-          studentId: true,
-          displayName: true,
         },
       },
     },
@@ -53,7 +51,7 @@ export const PATCH = withTeacherAuth(async (
     action: "class.enrollment.update",
     targetType: "class_enrollment",
     targetId: enrollmentId,
-    summary: `Marked ${enrollment.student.displayName} as ${status} in ${managedClass.name}.`,
+    summary: `Marked the student as ${status} in ${managedClass.name}.`,
     metadata: {
       classId,
       studentId: enrollment.student.id,

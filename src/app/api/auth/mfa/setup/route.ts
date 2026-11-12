@@ -53,7 +53,7 @@ export const POST = withTeacherAuth(async (session) => {
     action: "mfa.setup_started",
     targetType: "student",
     targetId: student.id,
-    summary: `MFA setup initiated for ${student.studentId}.`,
+    summary: `MFA setup initiated.`,
   });
 
   return NextResponse.json({

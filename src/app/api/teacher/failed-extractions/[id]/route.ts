@@ -163,8 +163,10 @@ function parseRowId(id: string): string {
  *
  * One dead-lettered row with its error text and stored payload, which holds
  * up to 8,000 characters of the student's conversation. The list route
- * returns neither, so this is the only staff read of that text, and it
- * writes a `failed_extraction` view row against the row's student.
+ * returns neither, so this is the only staff read of that text. A plain read
+ * writes a sampled `failed_extraction` view row against the row's student;
+ * `?include=payload` writes an unsampled `failed_extraction_payload` row on
+ * every fetch, and the chat text is refused if that row cannot be written.
  *
  * The shared demo instructor is refused here as well as from the list: the
  * proxy's read-deny entry names the list path only
@@ -198,27 +200,46 @@ export const GET = withTeacherAuth(async (
   if (!row) throw notFound("Failed extraction not found");
   const student = await assertStaffCanManageStudent(session, row.studentId);
 
-  await recordStudentView({
+  const { recorded } = await recordStudentView({
     actorId: session.id,
     actorRole: session.role,
     targetStudentId: student.id,
-    surface: "failed_extraction",
+    surface: includePayload ? "failed_extraction_payload" : "failed_extraction",
   });
+  if (includePayload && !recorded) {
+    return NextResponse.json(
+      { error: "The chat text could not be logged, so it was not shown. Please try again." },
+      { status: 500 },
+    );
+  }
 
-  return NextResponse.json({
-    success: true,
-    data: {
-      id: row.id,
-      conversationId: row.conversationId,
-      extractorKey: row.extractorKey,
-      error: row.error,
-      attempts: row.attempts,
-      status: row.status,
-      createdAt: row.createdAt,
-      ...(includePayload ? { payload: row.payload } : {}),
-    },
-  });
+  return NextResponse.json({ success: true, data: detailView(row, includePayload) });
 });
+
+interface DetailRow {
+  id: string;
+  conversationId: string | null;
+  extractorKey: string;
+  error: string;
+  attempts: number;
+  status: string;
+  createdAt: Date;
+  payload: string;
+}
+
+/** The row as staff see it; the chat snapshot only when asked for. */
+function detailView(row: DetailRow, includePayload: boolean) {
+  return {
+    id: row.id,
+    conversationId: row.conversationId,
+    extractorKey: row.extractorKey,
+    error: row.error,
+    attempts: row.attempts,
+    status: row.status,
+    createdAt: row.createdAt,
+    ...(includePayload ? { payload: row.payload } : {}),
+  };
+}
 
 /**
  * POST /api/teacher/failed-extractions/:id

@@ -75,7 +75,7 @@ export const POST = withTeacherAuth(async (
     action: "class.student.create",
     targetType: "student",
     targetId: student.id,
-    summary: `Created student ${student.studentId} and enrolled in ${managedClass.name}.`,
+    summary: `Created a student and enrolled them in ${managedClass.name}.`,
     metadata: { classId, studentId: student.id },
   });
 

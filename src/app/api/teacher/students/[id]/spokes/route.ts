@@ -352,7 +352,7 @@ export const PUT = withTeacherAuth(async (
     action: "teacher.spokes.record.update",
     targetType: "spokes_record",
     targetId: record.id,
-    summary: `Updated SPOKES record for ${record.firstName} ${record.lastName}.`,
+    summary: `Updated a SPOKES record.`,
     metadata: {
       studentId: id,
       status: record.status,

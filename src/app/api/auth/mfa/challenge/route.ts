@@ -178,7 +178,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       action: "mfa.challenge_failed",
       targetType: "student",
       targetId: student.id,
-      summary: `MFA challenge failed for ${student.studentId}.`,
+      summary: `MFA challenge failed.`,
       metadata: { ip },
     });
 
@@ -202,7 +202,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     action: "mfa.challenge_success",
     targetType: "student",
     targetId: student.id,
-    summary: `MFA challenge passed for ${student.studentId}.`,
+    summary: `MFA challenge passed.`,
     metadata: {
       ip,
       method: usedBackupCode ? "backup_code" : "totp",

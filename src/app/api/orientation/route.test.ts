@@ -18,7 +18,7 @@ const mockProgressUpsert = mock.fn<(args: {
 }) => Promise<unknown>>();
 const mockSubmissionFindMany = mock.fn<(args: unknown) => Promise<unknown[]>>();
 const mockSyncStudentAlerts = mock.fn<(studentId: string) => Promise<void>>();
-const mockAssertStaffCanManageStudent = mock.fn<(session: Session, studentId: string) => Promise<void>>();
+const mockAssertStaffCanManageStudent = mock.fn<(session: Session, studentId: string) => Promise<{ id: string }>>();
 
 function makeHttpError(statusCode: number, message: string) {
   const error = new Error(message) as Error & { statusCode: number };
@@ -106,7 +106,7 @@ describe("POST /api/orientation (signature guard)", () => {
     mockSubmissionFindMany.mock.mockImplementation(async () => []);
     mockProgressUpsert.mock.mockImplementation(async () => ({}));
     mockSyncStudentAlerts.mock.mockImplementation(async () => undefined);
-    mockAssertStaffCanManageStudent.mock.mockImplementation(async () => undefined);
+    mockAssertStaffCanManageStudent.mock.mockImplementation(async (_session, studentId) => ({ id: studentId }));
   });
 
   it("rejects a student completing a signature-required item with no signed form", async () => {
@@ -241,7 +241,7 @@ describe("POST /api/orientation (verification flow)", () => {
     mockSubmissionFindMany.mock.mockImplementation(async () => []);
     mockProgressUpsert.mock.mockImplementation(async () => ({}));
     mockSyncStudentAlerts.mock.mockImplementation(async () => undefined);
-    mockAssertStaffCanManageStudent.mock.mockImplementation(async () => undefined);
+    mockAssertStaffCanManageStudent.mock.mockImplementation(async (_session, studentId) => ({ id: studentId }));
   });
 
   it("stores a student's claim as pending, not completed, and flags the response", async () => {

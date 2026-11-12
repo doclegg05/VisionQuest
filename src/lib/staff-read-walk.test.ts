@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { classifyGetRoute, stripComments } from "./staff-read-walk";
+import { classifyGetRoute, libReach, stripComments } from "./staff-read-walk";
 
 const STAFF_GET_NO_VIEW = `
 import { assertStaffCanManageStudent } from "@/lib/classroom";
@@ -45,7 +45,7 @@ export const GET = withAuth(async (session, req) => {
     assert.deepEqual(result, {
       kind: "in_scope",
       records: true,
-      why: ["calls a staff-on-student guard", "reads ?studentId="],
+      why: ["calls a staff-on-student guard", "reads a student query parameter"],
     });
   });
 
@@ -67,6 +67,88 @@ export const PATCH = withAuth(async (session) => {
 
   it("reports a file with no GET", () => {
     assert.deepEqual(classifyGetRoute("src/app/api/x/route.ts", "export const POST = 1;\n"), { kind: "no_get" });
+  });
+});
+
+describe("the stronger walk (H15c item 6)", () => {
+  const lib = libReach([
+    {
+      file: "src/lib/panel-data.ts",
+      source: `
+async function scoped(session, id) {
+  return assertStaffCanManageStudent(session, id);
+}
+export async function loadPanel(session, id) {
+  await scoped(session, id);
+  return {};
+}
+export function shape(x) { return x; }
+`,
+    },
+    {
+      file: "src/lib/dashboard/tasks.ts",
+      source: `
+export async function listTasks(session, id) {
+  const where = buildManagedStudentWhere(session);
+  return where;
+}
+export async function tasksForPanel(session, id) {
+  return listTasks(session, id);
+}
+`,
+    },
+    {
+      file: "src/lib/views.ts",
+      source: "export async function auditPanel(session, id) {\n  await recordStudentView({ targetStudentId: id });\n}\n",
+    },
+  ]);
+
+  it("finds exported src/lib helpers that reach a guard, across files", () => {
+    assert.deepEqual([...lib.guards].sort(), ["listTasks", "loadPanel", "tasksForPanel"]);
+    assert.deepEqual([...lib.recorders], ["auditPanel"]);
+  });
+
+  it("puts a route in scope when it calls a guarding src/lib helper", () => {
+    const source = "export const GET = withAuth(async (session) => NextResponse.json(await loadPanel(session, 'x')));\n";
+    assert.deepEqual(classifyGetRoute("src/app/api/x/route.ts", source, lib), {
+      kind: "in_scope",
+      records: false,
+      why: ["calls a staff-on-student guard"],
+    });
+  });
+
+  it("counts a view recorded through a src/lib helper", () => {
+    const source = "export const GET = withAuth(async (session) => {\n  await loadPanel(session, 'x');\n  await auditPanel(session, 'x');\n});\n";
+    const result = classifyGetRoute("src/app/api/x/route.ts", source, lib);
+    assert.equal(result.kind === "in_scope" && result.records, true);
+  });
+
+  it("matches buildManagedStudentWhere as a guard", () => {
+    const source = "export const GET = withAuth(async (session) => {\n  const where = buildManagedStudentWhere(session);\n});\n";
+    assert.equal(classifyGetRoute("src/app/api/x/route.ts", source).kind, "in_scope");
+  });
+
+  it("follows export const GET = withX(handlerFn)", () => {
+    const source = `
+async function handler(session, req) {
+  await assertStaffCanManageStudent(session, "x");
+  return NextResponse.json({});
+}
+export const GET = withTeacherAuth(handler);
+`;
+    assert.deepEqual(classifyGetRoute("src/app/api/x/route.ts", source), {
+      kind: "in_scope",
+      records: false,
+      why: ["calls a staff-on-student guard"],
+    });
+  });
+
+  it("counts any query parameter that names a student", () => {
+    for (const param of ["targetStudentId", "student", "studentIds"]) {
+      const source = `export async function GET(req) {\n  const id = new URL(req.url).searchParams.get("${param}");\n}\n`;
+      const result = classifyGetRoute("src/app/api/x/route.ts", source);
+      assert.equal(result.kind, "in_scope", param);
+    }
   });
 });
 

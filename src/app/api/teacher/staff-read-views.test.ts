@@ -295,12 +295,30 @@ describe("GET /api/teacher/failed-extractions/[id] returns the one row", () => {
     assert.doesNotMatch(JSON.stringify(body), /I want my GED/u);
   });
 
-  it("returns the snapshot only on ?include=payload, and still records the view", async () => {
+  it("returns the snapshot only on ?include=payload, under its own surface", async () => {
     const res = await call(detail(), { url: "/x?include=payload" });
     const body = await res.json();
 
     assert.match(body.data.payload, /I want my GED/u);
-    assert.deepEqual(viewRows().map((row) => row.action), ["teacher.student.view.failed_extraction"]);
+    assert.deepEqual(viewRows().map((row) => row.action), ["teacher.student.view.failed_extraction_payload"]);
+  });
+
+  it("writes a row for every chat-text fetch, even after a plain view the same day", async () => {
+    await call(detail());
+    await call(detail(), { url: "/x?include=payload" });
+    await call(detail(), { url: "/x?include=payload" });
+    assert.deepEqual(viewRows().map((row) => row.action), [
+      "teacher.student.view.failed_extraction",
+      "teacher.student.view.failed_extraction_payload",
+      "teacher.student.view.failed_extraction_payload",
+    ]);
+  });
+
+  it("refuses the chat text when its row cannot be written", async () => {
+    failAuditWrites = true;
+    const res = await call(detail(), { url: "/x?include=payload" });
+    assert.equal(res.status, 500);
+    assert.doesNotMatch(await res.text(), /I want my GED/u);
   });
 });
 

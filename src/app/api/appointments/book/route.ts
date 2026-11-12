@@ -76,7 +76,7 @@ export const POST = withAuth(async (session, req: Request) => {
       action: "appointment.booked",
       targetType: "appointment",
       targetId: appointment.id,
-      summary: `Booked "${appointment.title}" with ${appointment.advisor.displayName}.`,
+      summary: `Booked "${appointment.title}" with an advisor.`,
       metadata: {
         advisorId,
         startsAt: appointment.startsAt.toISOString(),

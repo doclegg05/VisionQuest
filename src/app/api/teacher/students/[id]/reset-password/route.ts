@@ -65,7 +65,7 @@ export const POST = withTeacherAuth(async (
     action: "teacher.password.reset",
     targetType: "student",
     targetId: id,
-    summary: `Teacher reset the password for ${student.studentId}.`,
+    summary: `Teacher reset the student's password.`,
     metadata: {
       studentId: student.studentId,
     },

@@ -235,7 +235,7 @@ async function startMfaChallenge(student: Student, ip: string): Promise<NextResp
     action: "auth.login_mfa_required",
     targetType: "student",
     targetId: student.id,
-    summary: `Password verified for ${student.studentId} — MFA challenge required.`,
+    summary: `Password verified; MFA challenge required.`,
     metadata: { ip },
   });
 
@@ -266,7 +266,7 @@ async function startSession(
     action: "auth.login",
     targetType: "student",
     targetId: student.id,
-    summary: `Login successful for ${student.studentId}.`,
+    summary: `Login successful.`,
     metadata: { ip },
   });
 
