@@ -226,6 +226,28 @@ describe("getDocumentContext", () => {
     assert.equal(mockHybridSearch.mock.calls[0].arguments[1], "staff");
   });
 
+  it("uses onboarding intent for both document and passage retrieval without losing the subject", async () => {
+    const subject = { studentId: "student-context" };
+    await getDocumentContext("What papers I gotta sign when I first start?", "student", 3, 6000, subject);
+    const [query, role, limit, actor] = mockHybridSearch.mock.calls[0].arguments;
+    assert.match(query, /orientation onboarding checklist/);
+    assert.equal(role, "student");
+    assert.equal(limit, 3);
+    assert.equal(actor, subject);
+    assert.deepEqual(mockGetBestChunks.mock.calls[0].arguments, [["doc-dress"], query, 2, subject]);
+  });
+
+  it("ranks the onboarding checklist above daily sign-in in the keyword fallback", async () => {
+    process.env.SAGE_RAG_MODE = "keyword";
+    mockDocFindMany.mock.mockImplementation(async () => [
+      keywordDoc({ id: "orientation", title: "SPOKES Checklist for Student Orientation", sageContextNote: "Overview of onboarding agreements." }),
+      keywordDoc({ id: "attendance", title: "Student Sign-in Sheet", sageContextNote: "Daily attendance roster." }),
+    ]);
+    const context = await getDocumentContext("What papers I gotta sign when I first start?", "student", 1);
+    assert.match(context, /id=orientation&/);
+    assert.doesNotMatch(context, /id=attendance&/);
+  });
+
   it("falls back to keyword scoring when hybrid returns null", async () => {
     mockHybridSearch.mock.mockImplementation(async () => null);
     const context = await getDocumentContext("what is the dress code?", "student");

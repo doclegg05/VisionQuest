@@ -11,7 +11,7 @@
 import { prisma } from "@/lib/db";
 import { cached } from "@/lib/cache";
 import { sanitizeForPrompt } from "./system-prompts";
-import { tokenizeForRetrieval } from "./retrieval-tokens";
+import { expandOnboardingPaperworkQuery, tokenizeForRetrieval } from "./retrieval-tokens";
 import { hybridSearchDocuments, getBestChunks, type QueryEmbeddingSubject } from "./hybrid-retrieval";
 
 interface SageDocument {
@@ -317,15 +317,16 @@ export async function getDocumentContext(
 ): Promise<string> {
   if (!isSageRagEnabled()) return "";
 
-  const messageLower = userMessage.toLowerCase();
+  const retrievalQuery = expandOnboardingPaperworkQuery(userMessage);
+  const messageLower = retrievalQuery.toLowerCase();
 
   if (getSageRagMode() === "hybrid") {
-    const hybridDocs = await hybridSearchDocuments(userMessage, callerRole, maxResults, subject);
+    const hybridDocs = await hybridSearchDocuments(retrievalQuery, callerRole, maxResults, subject);
     if (hybridDocs !== null) {
       const docIds = hybridDocs.map((d) => d.id);
       const [snippets, chunksByDoc] = await Promise.all([
         loadSageSnippets(),
-        getBestChunks(docIds, userMessage, 2, subject),
+        getBestChunks(docIds, retrievalQuery, 2, subject),
       ]);
 
       const docEntries: ScoredEntry[] = hybridDocs.map((doc) => {

@@ -50,3 +50,19 @@ export function tokenizeForRetrieval(text: string, minLength: number): string[] 
       ?.filter((word) => word.length >= minLength && !GENERIC_RETRIEVAL_WORDS.has(word)) ?? []
   );
 }
+
+/**
+ * Everyday first-day paperwork questions rarely name "orientation". Without
+ * that context, "sign" alone can rank a daily sign-in sheet above the
+ * onboarding checklist. Expand only that combined intent, leaving attendance,
+ * account sign-in and employment paperwork searches alone. This changes the
+ * retrieval query, never the student's message or the source material.
+ */
+export function expandOnboardingPaperworkQuery(message: string): string {
+  const paperwork = /\b(?:papers?|paperwork|forms?|documents?|sign|signing|signed)\b/i.test(message);
+  const onboarding = /\b(?:first (?:start|day|class|visit)|new (?:here|student)|(?:join|joining|start|starting) (?:the )?(?:spokes|program|class)|just (?:joined|started))\b/i.test(message);
+  const employment = /\b(?:job|employer|employment|workplace|work)\b/i.test(message);
+  return paperwork && onboarding && !employment
+    ? `${message}\norientation onboarding checklist required forms signatures`
+    : message;
+}
