@@ -154,3 +154,6 @@ spokes-visual/
 
 # Env runner logs (scripts/terminal/run-with-env.mjs)
 reports/terminal/
+
+# Controlled first-day gate-removal reports are CI artifacts.
+/reports/first-day-gate-proof/

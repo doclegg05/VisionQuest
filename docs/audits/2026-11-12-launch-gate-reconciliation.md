@@ -91,3 +91,14 @@ through list/detail refreshes fixes it; the unchanged create/save focus and
 scroll assertions now pass locally (one browser test, no retries). User input
 cancels preservation. The build, targeted lint and 29 focused unit tests pass.
 CI still needs to rerun on the correction.
+
+T6 controlled-removal preflight now passes completely on `45bf87d7`, using
+an isolated local PostgreSQL 17 database and CI Playwright settings. The
+baseline passes; removing password, notice and recovery enforcement separately
+produces exactly one failure at the expected gate. Their actual paths are
+`/sage-notice`, `/recovery-setup` and `/settings`. The latter is also protected
+by the student layout: a refresh of the cleared-password page can lead there
+instead of Dashboard. The proof accepts only those two known protected paths
+for this negative case. The positive browser test still requires
+`/recovery-setup` exactly. All source mutations were restored. CI must still
+confirm the proof against its PostgreSQL 16 database on the pushed head.
