@@ -1,0 +1,33 @@
+{
+  "suite": "sage-grounding",
+  "tier": "nightly",
+  "startedAt": "2026-11-14T13:03:44.196Z",
+  "durationMs": 9337,
+  "commit": "65438f4",
+  "provider": null,
+  "model": null,
+  "host": {
+    "os": "linux x64",
+    "cpus": 4,
+    "memGb": 15.6,
+    "node": "v24.22.2",
+    "ollama": null
+  },
+  "metrics": [
+    {
+      "id": "pass_rate",
+      "value": 1,
+      "unit": "ratio",
+      "direction": "higher",
+      "n": 3,
+      "floor": 1,
+      "tolerance": 0,
+      "baseline": null,
+      "status": "pass",
+      "details": {
+        "failing": []
+      }
+    }
+  ],
+  "status": "pass"
+}
